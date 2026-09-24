@@ -1,0 +1,58 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xccheckout
+*.moved-aside
+DerivedData/
+build/
+*.hmap
+*.ipa
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Maintainer notes. Never public.
+private/
+
+# Agent tooling and local trackers
+.grok/
+.codex/
+.claude/
+.cursor/
+.basecamp/
+.idea/
+.vscode/
+tmp/
+
+# Coverage
+*.profraw
+
+# Secrets / signing
+*.p12
+*.p8
+*.key
+*.cer
+*.provisionprofile
+.env
+.env.*
+*.local
+
+# Accidental product drops
+*.dmg
+
+# Python
+__pycache__/

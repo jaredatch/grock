@@ -1,0 +1,802 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		04F31F5D45F834A6E3C137D6 /* AppearancePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83662634ED3251F7B817681 /* AppearancePreference.swift */; };
+		07EC194E3609189EA0EB9A5F /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E542C3FF981ACA89718A074E /* FloatingPanel.swift */; };
+		0B3206983E1269BF896CE491 /* DownloadPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78BB0A0103E5AC34A626A62 /* DownloadPaths.swift */; };
+		0BB0D10AC134BA1538B3641E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = D5B1489316BA86342B5F94F6 /* AppIcon.icon */; };
+		0F6BA32F2E70F1B2E389D737 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EF65168A927E37EDAC377F6 /* main.swift */; };
+		10D5D3A2B441ABA9C14413C7 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 3619E7899DAD1E3D78CD98FC /* Sparkle */; };
+		1746CD8C269FDE41C77255AD /* ContextIntakeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38AC204DC50FA72F7F86C195 /* ContextIntakeTests.swift */; };
+		1D3D40DAE9B1292B57E883C6 /* GrockApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A087ECCEB0796CD753CC70E0 /* GrockApp.swift */; };
+		294F7D7B89E671DB2BB2CFFC /* GrockCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2715C1CF69D7721F00122A23 /* GrockCLIInstaller.swift */; };
+		2B405732E89FE07A74BB8A14 /* ReplyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B5BACB0A1767F5DF8F1B0B /* ReplyMonitor.swift */; };
+		35C4053CDFAC53C12F139FFB /* WebRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00A9D0F5938635B8F30131 /* WebRecoveryTests.swift */; };
+		3611B0319E2FC67F5CA811A1 /* AuthPopupPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBA5C819DB32EF4D4A344F6 /* AuthPopupPresenter.swift */; };
+		389711197A2E9AA1C4B61360 /* FileHandoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438409FE6D20665EDFEE896D /* FileHandoffTests.swift */; };
+		3933DD33F9EA4AC122F40C8D /* GrokChromeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FE46DCB8958CA54BF6EAF4 /* GrokChromeScript.swift */; };
+		3A567F723F643D8C49C6408A /* WebBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69654E1C933CCC7181D8BF8C /* WebBoundaryTests.swift */; };
+		3E42BC5E4E044C3F56AD7706 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55571332B997C6E3FD1A544E /* Sparkle */; };
+		4F2B99AE2216FBB7ADCDFBBD /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BD7E197C6171781065C2CF /* ContentView.swift */; };
+		5418806A34423361F6DCD477 /* GrockURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82B1223F69AAF7E09A6A1240 /* GrockURL.swift */; };
+		58A93E0670952D5FCA7E8003 /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02CD0EC708A3976D98DBF3A6 /* AppNotifications.swift */; };
+		5B2B721EB1F52FE6ED026B0A /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21DC4F21181AC31F7101142F /* HotkeyManager.swift */; };
+		5C3921AEDE234ACBAD93436F /* WebViewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A13C54E19444C029DAAD1A /* WebViewStore.swift */; };
+		63C9005F09FF64E964B34340 /* LaunchLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B53C89D2F7F4340C84D98EA /* LaunchLoadingView.swift */; };
+		65228872A7D15AA8CD6E6B51 /* GrockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C64D4385DD542031771748C /* GrockTests.swift */; };
+		65A430B769CCD59DF6FCF580 /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44695625109A003B8E78D550 /* UpdaterController.swift */; };
+		6A65A4F00DE534A5ECD6735D /* QuickChatPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5069C5E5333650FC83C9BE27 /* QuickChatPanel.swift */; };
+		721AC9968538A40050C74165 /* FileIntake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 609CD86A1192F783F178B705 /* FileIntake.swift */; };
+		73E24AD9F15365CED3601939 /* QuickChatController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AEF4B7CBDD313313CEDEFED /* QuickChatController.swift */; };
+		8728BCB532C145EE4BFE18B5 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE8553E4237C335938DDE298 /* LaunchAtLogin.swift */; };
+		8F524C4B94530C2B7EEAC1E7 /* QuickChatPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264755FDFA451D64AAD4E857 /* QuickChatPayload.swift */; };
+		8FE11C0A93E65C23091FBCB5 /* WebRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B33436C79523120B711B5C8 /* WebRecovery.swift */; };
+		98D995E647C9C6FD3C697036 /* LaunchReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA94E5CD3C2F25596B4F948B /* LaunchReason.swift */; };
+		AAAAC28B0CBD9882EFB3A7F9 /* GrokWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D49AC1FFDF067239FE9275B /* GrokWebView.swift */; };
+		B46E391CC4D0567207133E49 /* GrockURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82B1223F69AAF7E09A6A1240 /* GrockURL.swift */; };
+		BD8B810A94B3E7475CB1BDFD /* GrockCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A814186F0BD628492C9F5DA3 /* GrockCommand.swift */; };
+		C94882F2D2ABCF1B477C63B1 /* QuickChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E77AAEFCE4274AD40CF8F9B /* QuickChatView.swift */; };
+		CA35D38687C8E7BC3F6D62B9 /* GrockCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A814186F0BD628492C9F5DA3 /* GrockCommand.swift */; };
+		CC02EDB44249A4E964CA1B68 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E04107269BD69EE3C3D0E2E /* SettingsView.swift */; };
+		CD3CCFBDF8AB758499311CDF /* ChatHandoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC1004BF5C715B459F659BE /* ChatHandoffTests.swift */; };
+		D074C0D0CA51EA22507F9D76 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888A85D432F618E75E8B9678 /* AppInfo.swift */; };
+		E1C7234A8E0565ADC77A4534 /* PasteboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47AC0C176C96CDAB9FA9060B /* PasteboardMonitor.swift */; };
+		E587FC7300E837957939F7CE /* CLIInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201F1DAB257252C6E55A478 /* CLIInstallerTests.swift */; };
+		EAEAFFC13D883F0A517DD0BB /* MoveToProjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A55CA7B5E6BDE62CD3CA1E /* MoveToProjectTests.swift */; };
+		F7EE5D48EC4F4E7293B479BD /* CorePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3E76D74163DE77562282A1 /* CorePolicyTests.swift */; };
+		F9383913E7C4997787733D71 /* WebNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC9E2AB24FA5CEB30089EC0 /* WebNavigation.swift */; };
+		FC728A88A5CBC07A74E59036 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA117A87B5EB6D5E5C9CCD13 /* AppDelegate.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		9C75508DE848D09A211B0924 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E00BE08A0E64FBA6F31973F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 40CA21838F0A76EA7D46D703;
+			remoteInfo = Grock;
+		};
+		F187B3C24D703E81013BD5FD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E00BE08A0E64FBA6F31973F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D024631858E13CD2FCFA351E;
+			remoteInfo = GrockCLI;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		02CD0EC708A3976D98DBF3A6 /* AppNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotifications.swift; sourceTree = "<group>"; };
+		0E77AAEFCE4274AD40CF8F9B /* QuickChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatView.swift; sourceTree = "<group>"; };
+		0FC9E2AB24FA5CEB30089EC0 /* WebNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebNavigation.swift; sourceTree = "<group>"; };
+		1F3E76D74163DE77562282A1 /* CorePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorePolicyTests.swift; sourceTree = "<group>"; };
+		21DC4F21181AC31F7101142F /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+		264755FDFA451D64AAD4E857 /* QuickChatPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatPayload.swift; sourceTree = "<group>"; };
+		2715C1CF69D7721F00122A23 /* GrockCLIInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrockCLIInstaller.swift; sourceTree = "<group>"; };
+		2D49AC1FFDF067239FE9275B /* GrokWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrokWebView.swift; sourceTree = "<group>"; };
+		38AC204DC50FA72F7F86C195 /* ContextIntakeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextIntakeTests.swift; sourceTree = "<group>"; };
+		3E04107269BD69EE3C3D0E2E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		4201F1DAB257252C6E55A478 /* CLIInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIInstallerTests.swift; sourceTree = "<group>"; };
+		438409FE6D20665EDFEE896D /* FileHandoffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileHandoffTests.swift; sourceTree = "<group>"; };
+		44695625109A003B8E78D550 /* UpdaterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterController.swift; sourceTree = "<group>"; };
+		47AC0C176C96CDAB9FA9060B /* PasteboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardMonitor.swift; sourceTree = "<group>"; };
+		5069C5E5333650FC83C9BE27 /* QuickChatPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatPanel.swift; sourceTree = "<group>"; };
+		53BD7E197C6171781065C2CF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		5AEF4B7CBDD313313CEDEFED /* QuickChatController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatController.swift; sourceTree = "<group>"; };
+		5B33436C79523120B711B5C8 /* WebRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRecovery.swift; sourceTree = "<group>"; };
+		5BBA5C819DB32EF4D4A344F6 /* AuthPopupPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthPopupPresenter.swift; sourceTree = "<group>"; };
+		609CD86A1192F783F178B705 /* FileIntake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileIntake.swift; sourceTree = "<group>"; };
+		627F46CBE4C9D6BBEFE60E98 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		69654E1C933CCC7181D8BF8C /* WebBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebBoundaryTests.swift; sourceTree = "<group>"; };
+		7B53C89D2F7F4340C84D98EA /* LaunchLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchLoadingView.swift; sourceTree = "<group>"; };
+		805CA0E9B1884D8AD77DA07D /* Grock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Grock.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		82B1223F69AAF7E09A6A1240 /* GrockURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrockURL.swift; sourceTree = "<group>"; };
+		888A85D432F618E75E8B9678 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
+		8EF65168A927E37EDAC377F6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		9C64D4385DD542031771748C /* GrockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrockTests.swift; sourceTree = "<group>"; };
+		A087ECCEB0796CD753CC70E0 /* GrockApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrockApp.swift; sourceTree = "<group>"; };
+		A2704C24AF19FA72D5E98AC5 /* GrockTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GrockTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A50B420923C816169F13D800 /* GrockCLI */ = {isa = PBXFileReference; includeInIndex = 0; path = GrockCLI; sourceTree = BUILT_PRODUCTS_DIR; };
+		A814186F0BD628492C9F5DA3 /* GrockCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrockCommand.swift; sourceTree = "<group>"; };
+		B29698D2E3CED62D10B69860 /* Grock.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Grock.entitlements; sourceTree = "<group>"; };
+		B2A55CA7B5E6BDE62CD3CA1E /* MoveToProjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveToProjectTests.swift; sourceTree = "<group>"; };
+		B2FE46DCB8958CA54BF6EAF4 /* GrokChromeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrokChromeScript.swift; sourceTree = "<group>"; };
+		BCC1004BF5C715B459F659BE /* ChatHandoffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHandoffTests.swift; sourceTree = "<group>"; };
+		CA117A87B5EB6D5E5C9CCD13 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		CE00A9D0F5938635B8F30131 /* WebRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRecoveryTests.swift; sourceTree = "<group>"; };
+		D5B1489316BA86342B5F94F6 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		E542C3FF981ACA89718A074E /* FloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanel.swift; sourceTree = "<group>"; };
+		E6A13C54E19444C029DAAD1A /* WebViewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewStore.swift; sourceTree = "<group>"; };
+		E78BB0A0103E5AC34A626A62 /* DownloadPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPaths.swift; sourceTree = "<group>"; };
+		E83662634ED3251F7B817681 /* AppearancePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
+		EA94E5CD3C2F25596B4F948B /* LaunchReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchReason.swift; sourceTree = "<group>"; };
+		F4B5BACB0A1767F5DF8F1B0B /* ReplyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMonitor.swift; sourceTree = "<group>"; };
+		FE8553E4237C335938DDE298 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		622EE50D3D9A2B513B16AC59 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10D5D3A2B441ABA9C14413C7 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FCB04325871E2B77230E28E8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3E42BC5E4E044C3F56AD7706 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		21594FFC256A90358E824BE0 /* GrockCLI */ = {
+			isa = PBXGroup;
+			children = (
+				8EF65168A927E37EDAC377F6 /* main.swift */,
+			);
+			path = GrockCLI;
+			sourceTree = "<group>";
+		};
+		32421EB30FC3C583DC25493C /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				53BD7E197C6171781065C2CF /* ContentView.swift */,
+				0E77AAEFCE4274AD40CF8F9B /* QuickChatView.swift */,
+				3E04107269BD69EE3C3D0E2E /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		3606A03120B969C545FCC11C /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CA117A87B5EB6D5E5C9CCD13 /* AppDelegate.swift */,
+				5BBA5C819DB32EF4D4A344F6 /* AuthPopupPresenter.swift */,
+				609CD86A1192F783F178B705 /* FileIntake.swift */,
+				E542C3FF981ACA89718A074E /* FloatingPanel.swift */,
+				A814186F0BD628492C9F5DA3 /* GrockCommand.swift */,
+				82B1223F69AAF7E09A6A1240 /* GrockURL.swift */,
+				21DC4F21181AC31F7101142F /* HotkeyManager.swift */,
+				FE8553E4237C335938DDE298 /* LaunchAtLogin.swift */,
+				7B53C89D2F7F4340C84D98EA /* LaunchLoadingView.swift */,
+				EA94E5CD3C2F25596B4F948B /* LaunchReason.swift */,
+				47AC0C176C96CDAB9FA9060B /* PasteboardMonitor.swift */,
+				5AEF4B7CBDD313313CEDEFED /* QuickChatController.swift */,
+				5069C5E5333650FC83C9BE27 /* QuickChatPanel.swift */,
+				44695625109A003B8E78D550 /* UpdaterController.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		79A2445E6CDD95776BD105E4 /* Grock */ = {
+			isa = PBXGroup;
+			children = (
+				3606A03120B969C545FCC11C /* App */,
+				C128A0C5857EF85006CC484B /* Utilities */,
+				32421EB30FC3C583DC25493C /* Views */,
+				E0264937A675A6B9CA6687E6 /* Web */,
+				D5B1489316BA86342B5F94F6 /* AppIcon.icon */,
+				B29698D2E3CED62D10B69860 /* Grock.entitlements */,
+				A087ECCEB0796CD753CC70E0 /* GrockApp.swift */,
+				627F46CBE4C9D6BBEFE60E98 /* Info.plist */,
+			);
+			path = Grock;
+			sourceTree = "<group>";
+		};
+		C128A0C5857EF85006CC484B /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				E83662634ED3251F7B817681 /* AppearancePreference.swift */,
+				888A85D432F618E75E8B9678 /* AppInfo.swift */,
+				02CD0EC708A3976D98DBF3A6 /* AppNotifications.swift */,
+				E78BB0A0103E5AC34A626A62 /* DownloadPaths.swift */,
+				2715C1CF69D7721F00122A23 /* GrockCLIInstaller.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		D0FA7BCD5083C15B8F4DC037 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				805CA0E9B1884D8AD77DA07D /* Grock.app */,
+				A50B420923C816169F13D800 /* GrockCLI */,
+				A2704C24AF19FA72D5E98AC5 /* GrockTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DB526A6717E8C032FCA703F1 /* GrockTests */ = {
+			isa = PBXGroup;
+			children = (
+				BCC1004BF5C715B459F659BE /* ChatHandoffTests.swift */,
+				4201F1DAB257252C6E55A478 /* CLIInstallerTests.swift */,
+				38AC204DC50FA72F7F86C195 /* ContextIntakeTests.swift */,
+				1F3E76D74163DE77562282A1 /* CorePolicyTests.swift */,
+				438409FE6D20665EDFEE896D /* FileHandoffTests.swift */,
+				9C64D4385DD542031771748C /* GrockTests.swift */,
+				B2A55CA7B5E6BDE62CD3CA1E /* MoveToProjectTests.swift */,
+				69654E1C933CCC7181D8BF8C /* WebBoundaryTests.swift */,
+				CE00A9D0F5938635B8F30131 /* WebRecoveryTests.swift */,
+			);
+			path = GrockTests;
+			sourceTree = "<group>";
+		};
+		E0264937A675A6B9CA6687E6 /* Web */ = {
+			isa = PBXGroup;
+			children = (
+				B2FE46DCB8958CA54BF6EAF4 /* GrokChromeScript.swift */,
+				2D49AC1FFDF067239FE9275B /* GrokWebView.swift */,
+				264755FDFA451D64AAD4E857 /* QuickChatPayload.swift */,
+				F4B5BACB0A1767F5DF8F1B0B /* ReplyMonitor.swift */,
+				0FC9E2AB24FA5CEB30089EC0 /* WebNavigation.swift */,
+				5B33436C79523120B711B5C8 /* WebRecovery.swift */,
+				E6A13C54E19444C029DAAD1A /* WebViewStore.swift */,
+			);
+			path = Web;
+			sourceTree = "<group>";
+		};
+		EEC59A5EDD745F0131AC91C5 = {
+			isa = PBXGroup;
+			children = (
+				79A2445E6CDD95776BD105E4 /* Grock */,
+				21594FFC256A90358E824BE0 /* GrockCLI */,
+				DB526A6717E8C032FCA703F1 /* GrockTests */,
+				D0FA7BCD5083C15B8F4DC037 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		40CA21838F0A76EA7D46D703 /* Grock */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 61EDF68E50B4A5113895B5D1 /* Build configuration list for PBXNativeTarget "Grock" */;
+			buildPhases = (
+				9EDB3F04F5965468D884D20C /* Sources */,
+				58D2CD8B8D6A1078D64310FA /* Resources */,
+				FCB04325871E2B77230E28E8 /* Frameworks */,
+				476E4687C7F9EE4235EFE3C5 /* Embed grock CLI */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C3A0B63B66D667BA7E7D49E3 /* PBXTargetDependency */,
+			);
+			name = Grock;
+			packageProductDependencies = (
+				55571332B997C6E3FD1A544E /* Sparkle */,
+			);
+			productName = Grock;
+			productReference = 805CA0E9B1884D8AD77DA07D /* Grock.app */;
+			productType = "com.apple.product-type.application";
+		};
+		79BBC5AED2DBCCB1A715C4D7 /* GrockTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E50EADD50079E28ACC60AF99 /* Build configuration list for PBXNativeTarget "GrockTests" */;
+			buildPhases = (
+				6BF1110CC7B5910553EB757B /* Sources */,
+				622EE50D3D9A2B513B16AC59 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3F2E7661B5611CD1C3E4AA9A /* PBXTargetDependency */,
+			);
+			name = GrockTests;
+			packageProductDependencies = (
+				3619E7899DAD1E3D78CD98FC /* Sparkle */,
+			);
+			productName = GrockTests;
+			productReference = A2704C24AF19FA72D5E98AC5 /* GrockTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		D024631858E13CD2FCFA351E /* GrockCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 03AB735191E4F6F08B16A215 /* Build configuration list for PBXNativeTarget "GrockCLI" */;
+			buildPhases = (
+				8FC52B3DF9F1AD8338770638 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GrockCLI;
+			packageProductDependencies = (
+			);
+			productName = GrockCLI;
+			productReference = A50B420923C816169F13D800 /* GrockCLI */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E00BE08A0E64FBA6F31973F9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 4EFCCDDD5FE58531FFC0B262 /* Build configuration list for PBXProject "Grock" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EEC59A5EDD745F0131AC91C5;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				61E429D17890959B3ECB7939 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D0FA7BCD5083C15B8F4DC037 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				40CA21838F0A76EA7D46D703 /* Grock */,
+				D024631858E13CD2FCFA351E /* GrockCLI */,
+				79BBC5AED2DBCCB1A715C4D7 /* GrockTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		58D2CD8B8D6A1078D64310FA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0BB0D10AC134BA1538B3641E /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		476E4687C7F9EE4235EFE3C5 /* Embed grock CLI */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed grock CLI";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nSRC=\"${BUILT_PRODUCTS_DIR}/grock\"\nDEST=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/SharedSupport/grock\"\nif [ ! -f \"$SRC\" ]; then\n  echo \"error: grock CLI was not built at $SRC\" >&2\n  exit 1\nfi\nmkdir -p \"$(dirname \"$DEST\")\"\ncp -f \"$SRC\" \"$DEST\"\nchmod +x \"$DEST\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6BF1110CC7B5910553EB757B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E587FC7300E837957939F7CE /* CLIInstallerTests.swift in Sources */,
+				CD3CCFBDF8AB758499311CDF /* ChatHandoffTests.swift in Sources */,
+				1746CD8C269FDE41C77255AD /* ContextIntakeTests.swift in Sources */,
+				F7EE5D48EC4F4E7293B479BD /* CorePolicyTests.swift in Sources */,
+				389711197A2E9AA1C4B61360 /* FileHandoffTests.swift in Sources */,
+				65228872A7D15AA8CD6E6B51 /* GrockTests.swift in Sources */,
+				EAEAFFC13D883F0A517DD0BB /* MoveToProjectTests.swift in Sources */,
+				3A567F723F643D8C49C6408A /* WebBoundaryTests.swift in Sources */,
+				35C4053CDFAC53C12F139FFB /* WebRecoveryTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8FC52B3DF9F1AD8338770638 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BD8B810A94B3E7475CB1BDFD /* GrockCommand.swift in Sources */,
+				5418806A34423361F6DCD477 /* GrockURL.swift in Sources */,
+				0F6BA32F2E70F1B2E389D737 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9EDB3F04F5965468D884D20C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FC728A88A5CBC07A74E59036 /* AppDelegate.swift in Sources */,
+				D074C0D0CA51EA22507F9D76 /* AppInfo.swift in Sources */,
+				58A93E0670952D5FCA7E8003 /* AppNotifications.swift in Sources */,
+				04F31F5D45F834A6E3C137D6 /* AppearancePreference.swift in Sources */,
+				3611B0319E2FC67F5CA811A1 /* AuthPopupPresenter.swift in Sources */,
+				4F2B99AE2216FBB7ADCDFBBD /* ContentView.swift in Sources */,
+				0B3206983E1269BF896CE491 /* DownloadPaths.swift in Sources */,
+				721AC9968538A40050C74165 /* FileIntake.swift in Sources */,
+				07EC194E3609189EA0EB9A5F /* FloatingPanel.swift in Sources */,
+				1D3D40DAE9B1292B57E883C6 /* GrockApp.swift in Sources */,
+				294F7D7B89E671DB2BB2CFFC /* GrockCLIInstaller.swift in Sources */,
+				CA35D38687C8E7BC3F6D62B9 /* GrockCommand.swift in Sources */,
+				B46E391CC4D0567207133E49 /* GrockURL.swift in Sources */,
+				3933DD33F9EA4AC122F40C8D /* GrokChromeScript.swift in Sources */,
+				AAAAC28B0CBD9882EFB3A7F9 /* GrokWebView.swift in Sources */,
+				5B2B721EB1F52FE6ED026B0A /* HotkeyManager.swift in Sources */,
+				8728BCB532C145EE4BFE18B5 /* LaunchAtLogin.swift in Sources */,
+				63C9005F09FF64E964B34340 /* LaunchLoadingView.swift in Sources */,
+				98D995E647C9C6FD3C697036 /* LaunchReason.swift in Sources */,
+				E1C7234A8E0565ADC77A4534 /* PasteboardMonitor.swift in Sources */,
+				73E24AD9F15365CED3601939 /* QuickChatController.swift in Sources */,
+				6A65A4F00DE534A5ECD6735D /* QuickChatPanel.swift in Sources */,
+				8F524C4B94530C2B7EEAC1E7 /* QuickChatPayload.swift in Sources */,
+				C94882F2D2ABCF1B477C63B1 /* QuickChatView.swift in Sources */,
+				2B405732E89FE07A74BB8A14 /* ReplyMonitor.swift in Sources */,
+				CC02EDB44249A4E964CA1B68 /* SettingsView.swift in Sources */,
+				65A430B769CCD59DF6FCF580 /* UpdaterController.swift in Sources */,
+				F9383913E7C4997787733D71 /* WebNavigation.swift in Sources */,
+				8FE11C0A93E65C23091FBCB5 /* WebRecovery.swift in Sources */,
+				5C3921AEDE234ACBAD93436F /* WebViewStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3F2E7661B5611CD1C3E4AA9A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 40CA21838F0A76EA7D46D703 /* Grock */;
+			targetProxy = 9C75508DE848D09A211B0924 /* PBXContainerItemProxy */;
+		};
+		C3A0B63B66D667BA7E7D49E3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D024631858E13CD2FCFA351E /* GrockCLI */;
+			targetProxy = F187B3C24D703E81013BD5FD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2387E02E4C16B701512C5AE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Grock/Grock.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Grock/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Grock;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaredatch.Grock;
+				PRODUCT_NAME = Grock;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		321041A2EF62249F276A5A73 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaredatch.GrockTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.10;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Grock.app/Contents/MacOS/Grock";
+			};
+			name = Debug;
+		};
+		49D9C3F5795C1AC1A89FE07E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaredatch.GrockTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.10;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Grock.app/Contents/MacOS/Grock";
+			};
+			name = Release;
+		};
+		82E86F581CACB3D43D6D9604 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaredatch.Grock.cli;
+				PRODUCT_MODULE_NAME = GrockCLI;
+				PRODUCT_NAME = grock;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+		9CD2D6355DE28374E9C7DE5A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaredatch.Grock.cli;
+				PRODUCT_MODULE_NAME = GrockCLI;
+				PRODUCT_NAME = grock;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		A7B7EB46C83A3CC589A1A390 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Grock/Grock.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Grock/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Grock;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaredatch.Grock;
+				PRODUCT_NAME = Grock;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+		D4BB227B685282172370D3F2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		DB7F66742B0D24B0EEE9029F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		03AB735191E4F6F08B16A215 /* Build configuration list for PBXNativeTarget "GrockCLI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9CD2D6355DE28374E9C7DE5A /* Debug */,
+				82E86F581CACB3D43D6D9604 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4EFCCDDD5FE58531FFC0B262 /* Build configuration list for PBXProject "Grock" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4BB227B685282172370D3F2 /* Debug */,
+				DB7F66742B0D24B0EEE9029F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		61EDF68E50B4A5113895B5D1 /* Build configuration list for PBXNativeTarget "Grock" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2387E02E4C16B701512C5AE0 /* Debug */,
+				A7B7EB46C83A3CC589A1A390 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E50EADD50079E28ACC60AF99 /* Build configuration list for PBXNativeTarget "GrockTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				321041A2EF62249F276A5A73 /* Debug */,
+				49D9C3F5795C1AC1A89FE07E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		61E429D17890959B3ECB7939 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3619E7899DAD1E3D78CD98FC /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 61E429D17890959B3ECB7939 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+		55571332B997C6E3FD1A544E /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 61E429D17890959B3ECB7939 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = E00BE08A0E64FBA6F31973F9 /* Project object */;
+}

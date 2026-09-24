@@ -1,0 +1,163 @@
+name: Grock
+options:
+  bundleIdPrefix: com.jaredatch
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "26.0"
+  minimumXcodeGenVersion: "2.40"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  fileTypes:
+    icon:
+      file: true
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.6
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_REQUIRED: NO
+    DEAD_CODE_STRIPPING: YES
+
+targets:
+  Grock:
+    type: application
+    platform: macOS
+    sources:
+      - path: Grock
+        excludes:
+          - "**/*.md"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaredatch.Grock
+        PRODUCT_NAME: Grock
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.10"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.productivity"
+        INFOPLIST_KEY_CFBundleDisplayName: Grock
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_DEBUG_DYLIB: NO
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        # Sandbox via entitlements file (network.client + downloads for the web shell).
+        CODE_SIGN_ENTITLEMENTS: Grock/Grock.entitlements
+    info:
+      path: Grock/Info.plist
+      properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: "Unofficial. Not affiliated with xAI or SpaceX."
+        # Sparkle (DEC-062). The private half of this key lives in the release Mac's Keychain; see docs/RELEASING.md.
+        SUFeedURL: https://raw.githubusercontent.com/jaredatch/grock/master/appcast.xml
+        SUPublicEDKey: 7TUeA8MaMpxJfBhuQYkZ0IpkItm1zk+8AJem/SQH58I=
+        SUEnableAutomaticChecks: true
+        SUEnableInstallerLauncherService: true
+        NSMicrophoneUsageDescription: "Grock needs the microphone for Grok voice mode in the web interface."
+        NSCameraUsageDescription: "Grock needs the camera when Grok requests media access."
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: com.jaredatch.Grock
+            CFBundleURLSchemes:
+              - grock
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Files
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.data
+              - public.content
+        NSServices:
+          - NSMenuItem:
+              default: Ask Grok
+            NSMessage: askGrok
+            NSPortName: Grock
+            NSSendFileTypes:
+              - public.data
+              - public.content
+            NSSendTypes:
+              - public.file-url
+            NSRequiredContext:
+              NSTextContent: FilePath
+            NSServiceDescription: Open a new Grock chat with this file
+    entitlements:
+      path: Grock/Grock.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.files.downloads.read-write: true
+        com.apple.security.files.user-selected.read-only: true
+        com.apple.security.device.audio-input: true
+        com.apple.security.device.camera: true
+        com.apple.security.temporary-exception.files.absolute-path.read-only:
+          - /usr/local/bin/
+          - /opt/homebrew/bin/
+        # Sparkle's installer launcher service, required inside App Sandbox (DEC-062).
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - com.jaredatch.Grock-spks
+          - com.jaredatch.Grock-spki
+    dependencies:
+      - target: GrockCLI
+        embed: false
+        link: false
+      - package: Sparkle
+    postBuildScripts:
+      - name: Embed grock CLI
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          SRC="${BUILT_PRODUCTS_DIR}/grock"
+          DEST="${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/SharedSupport/grock"
+          if [ ! -f "$SRC" ]; then
+            echo "error: grock CLI was not built at $SRC" >&2
+            exit 1
+          fi
+          mkdir -p "$(dirname "$DEST")"
+          cp -f "$SRC" "$DEST"
+          chmod +x "$DEST"
+
+  GrockCLI:
+    type: tool
+    platform: macOS
+    sources:
+      - path: GrockCLI
+      - path: Grock/App/GrockURL.swift
+      - path: Grock/App/GrockCommand.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaredatch.Grock.cli
+        PRODUCT_NAME: grock
+        PRODUCT_MODULE_NAME: GrockCLI
+        SWIFT_VERSION: "5.10"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_DEBUG_DYLIB: NO
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+
+  GrockTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: GrockTests
+    dependencies:
+      - target: Grock
+      - package: Sparkle
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaredatch.GrockTests
+        SWIFT_VERSION: "5.10"
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO

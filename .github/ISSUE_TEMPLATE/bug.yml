@@ -1,0 +1,27 @@
+name: Bug report
+description: Something in Grock stopped working.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us what happened and how to reproduce it. Please remove private conversations, file contents, account details, and tokens from screenshots or logs.
+        For a security issue, see SECURITY.md before posting details here.
+  - type: input
+    id: version
+    attributes:
+      label: Grock and macOS versions
+      placeholder: Grock 1.0.0, macOS 26.6
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened?
+      description: Include the steps, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else that helps?
+      description: For page issues, name the surface (Chat, Imagine, Library, or sign-in). For window issues, mention displays, Spaces, and how you opened Grock. Avoid private conversation URLs.
