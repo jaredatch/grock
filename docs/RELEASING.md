@@ -75,7 +75,7 @@ Then add a dated entry to `CHANGELOG.md`, run the checks above, commit, and push
   --notary-profile grock-notary
 ```
 
-The script signs Sparkle, the CLI, and the app, submits the package to Apple, checks acceptance, staples the app, and creates `Grock-X.Y.Z-arm64.zip` with a SHA-256 checksum. Everything lands in a fresh `DerivedData/ReleaseArtifacts/run.XXXXXX/` folder, next to Apple's `notarization.json`. It also signs the ZIP with the Sparkle key and rewrites `appcast.xml` at the repo root. A good run prints `RELEASE CHECK OK` after stapling, then `VERIFIED RELEASE` and `APPCAST UPDATED` at the end.
+The script signs Sparkle, the CLI, and the app, submits the package to Apple, checks acceptance, staples the app, and creates `Grock-X.Y.Z-arm64.zip` with a SHA-256 checksum. Everything lands in a fresh `DerivedData/ReleaseArtifacts/run.XXXXXX/` folder, next to Apple's `notarization.json`. It also signs the ZIP with the Sparkle key and rewrites `appcast.xml` at the repo root. The ZIP leaves out extended attributes, and the script unzips a fresh copy and checks that too, since that's what people actually run. A good run prints `RELEASE CHECK OK` twice (the stapled app, then the unzipped copy), then `VERIFIED RELEASE` and `APPCAST UPDATED` at the end.
 
 To check a Developer ID build without submitting it to Apple, use `--sign-only` instead of `--notary-profile`.
 

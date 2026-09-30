@@ -95,8 +95,13 @@ if [ "$LOCAL" -eq 1 ] || [ "$SIGN_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+# No extended attributes in the archives. macOS stamps every file with
+# com.apple.provenance, ditto stores that as ._ entries, and Archive Utility
+# leaves the ones beside Sparkle's symlinks as real files. Gatekeeper then
+# rejects the app for unsealed contents in the framework root.
+ZIP_ARGS=(-c -k --norsrc --noextattr --noacl --keepParent)
 UPLOAD="$OUTPUT/notary-upload.zip"
-ditto -c -k --keepParent "$APP" "$UPLOAD"
+ditto "${ZIP_ARGS[@]}" "$APP" "$UPLOAD"
 xcrun notarytool submit "$UPLOAD" --keychain-profile "$PROFILE" --wait \
   --output-format json > "$OUTPUT/notarization.json"
 python3 - "$OUTPUT/notarization.json" <<'PY'
@@ -110,8 +115,17 @@ xcrun stapler validate "$APP"
 python3 "$REPO/script/verify_release.py" "$APP" --distribution --notarized
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 ZIP="$OUTPUT/Grock-$VERSION-arm64.zip"
-ditto -c -k --keepParent "$APP" "$ZIP"
+ditto "${ZIP_ARGS[@]}" "$APP" "$ZIP"
 (cd "$OUTPUT" && shasum -a 256 "$(basename "$ZIP")" > "$(basename "$ZIP").sha256")
+# Check the ZIP people download, not just the app it came from. Plain unzip
+# writes any ._ entries as files, the same way Archive Utility does.
+if zipinfo -1 "$ZIP" | grep -Eq '(^|/)\._|^__MACOSX/'; then
+  echo 'release: the ZIP contains AppleDouble (._) entries' >&2; exit 1
+fi
+EXTRACTED="$(mktemp -d "$OUTPUT/extracted.XXXXXX")"
+unzip -q "$ZIP" -d "$EXTRACTED"
+python3 "$REPO/script/verify_release.py" "$EXTRACTED/Grock.app" --distribution --notarized
+rm -rf "$EXTRACTED"
 rm "$UPLOAD"
 
 # Appcast. generate_appcast signs the ZIP with the Grock EdDSA key in Keychain

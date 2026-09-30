@@ -154,7 +154,7 @@ A grok.com change can now produce a visible "please check" instead of a silent p
 
 ## DEC-060. The release artifact gets verified, not trusted
 
-Development builds disable signing, so a green build says nothing about running inside App Sandbox. `script/release.sh` builds a Release app, signs the CLI and the app, and runs a verifier that reads the actual signatures, entitlements, hardened runtime, architecture, and deployment target. Distribution mode notarizes, staples, and zips with a checksum. CI runs the local variant on every push to `master` and every pull request.
+Development builds disable signing, so a green build says nothing about running inside App Sandbox. `script/release.sh` builds a Release app, signs the CLI and the app, and runs a verifier that reads the actual signatures, entitlements, hardened runtime, architecture, and deployment target. Distribution mode notarizes, staples, zips with a checksum, then unzips that ZIP and verifies the copy, because a stray file from the archive is enough for Gatekeeper to refuse the app. CI runs the local variant on every push to `master` and every pull request.
 
 Releases take a Terminal session with Keychain access. Nothing about signing lives in the repo.
 
