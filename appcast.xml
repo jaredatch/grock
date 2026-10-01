@@ -1,0 +1,16 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Grock</title>
+        <item>
+            <title>1.0.0</title>
+            <pubDate>Wed, 30 Sep 2026 10:16:50 -0500</pubDate>
+            <link>https://github.com/jaredatch/grock</link>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/jaredatch/grock/releases/download/v1.0.0/Grock-1.0.0-arm64.zip" length="3237340" type="application/octet-stream" sparkle:edSignature="Uq0xrOjMx5NFVQIk20hHqcNEGxvKUmVWpUa6IcZii2n7KHKdq0K06Xz610iwUsmeJeZj93mgV/0xFpIJmu0XCQ=="/>
+        </item>
+    </channel>
+</rss>

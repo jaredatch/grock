@@ -1,8 +1,6 @@
 # Changelog
 
-## 1.0.0
-
-<!-- TODO at tag time: set the date. -->
+## 1.0.0 (2026-10-01)
 
 First public release. Grock is a native macOS launcher for grok.com, and this is everything it does on day one:
 
