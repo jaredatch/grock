@@ -3,6 +3,16 @@
     <channel>
         <title>Grock</title>
         <item>
+            <title>1.0.2</title>
+            <pubDate>Wed, 04 Nov 2026 21:12:10 +0000</pubDate>
+            <link>https://github.com/jaredatch/grock</link>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/jaredatch/grock/releases/download/v1.0.2/Grock-1.0.2-arm64.zip" length="3237246" type="application/octet-stream" sparkle:edSignature="/VRrBtKkYVYkmpfeM715EABnswPt50c7TNYN9pg+ZsVIui8djsp+AhD0y1vXJ5OfrCG4j2yyw0bKGNYChiSYAw=="/>
+        </item>
+        <item>
             <title>1.0.1</title>
             <pubDate>Wed, 04 Nov 2026 19:14:54 +0000</pubDate>
             <link>https://github.com/jaredatch/grock</link>
