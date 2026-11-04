@@ -10,7 +10,7 @@ final class CorePolicyTests: XCTestCase {
     }
 
     func testMarketingVersionMatchesProject() {
-        XCTAssertEqual(AppInfo.expectedMarketingVersion, "1.0.1")
+        XCTAssertEqual(AppInfo.expectedMarketingVersion, "1.0.2")
         let bundle = Bundle(for: AppDelegate.self)
         XCTAssertEqual(
             bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,

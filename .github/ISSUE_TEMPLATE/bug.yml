@@ -10,7 +10,7 @@ body:
     id: version
     attributes:
       label: Grock and macOS versions
-      placeholder: Grock 1.0.1, macOS 26.6
+      placeholder: Grock 1.0.2, macOS 26.6
     validations:
       required: true
   - type: textarea

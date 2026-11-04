@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 (2026-11-04)
+
+- Search, and See all under Chats, open fully on screen again. grok.com moved its search window, and Grock was still nudging it down for the old layout, which pushed it halfway off the bottom.
+- New Chat no longer shows grok.com's subscription card in the corner.
+
 ## 1.0.1 (2026-11-04)
 
 Maintenance release. Updates are now built, signed, and published automatically, and this is the first one shipped that way. If Grock 1.0.0 offered you this version and installed it, the updater works end to end. Nothing else in the app changes.
