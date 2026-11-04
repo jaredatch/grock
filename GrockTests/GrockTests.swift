@@ -584,15 +584,10 @@ final class GrockTests: XCTestCase {
         XCTAssertTrue(WebViewStore.chromeScript.contains("html[data-grock-shell-inset]:not([data-grock-imagine]) #grok-content-area [class*=\"from-surface-base\"]"))
         XCTAssertTrue(WebViewStore.chromeScript.contains("html[data-grock-imagine] #grok-content-area[data-grock-imagine-inset=\"pad\"],"))
         XCTAssertTrue(WebViewStore.chromeScript.contains("applyImagineShellInset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("commandMenuInsetCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[cmdk-root],[cmdk-list],[cmdk-input]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[cmdk-list-sizer]>*"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[role=\"dialog\"]:has([cmdk-root],[cmdk-list],[cmdk-input])"))
         XCTAssertFalse(WebViewStore.chromeScript.contains("html:not([data-grock-imagine]) [role=\"dialog\"]:has("))
         XCTAssertFalse(WebViewStore.chromeScript.contains("html:not([data-grock-imagine]) [data-grock-plugins-dialog]"))
         XCTAssertTrue(WebViewStore.chromeScript.contains("50% + (var(--grock-titlebar) / 2)"))
         XCTAssertTrue(WebViewStore.chromeScript.contains("100dvh - var(--grock-titlebar) - 32px"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("100dvh - var(--grock-titlebar) - 136px"))
         XCTAssertTrue(WebViewStore.chromeScript.contains("pluginsDialogInsetCSS"))
         XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-plugins-dialog"))
         XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-plugins-overlay"))
@@ -2569,6 +2564,18 @@ final class GrockTests: XCTestCase {
           <div id="other-popover" data-radix-popper-content-wrapper>
             <div role="dialog" aria-label="Account notice"><p>Sign in</p><button>Dismiss</button></div>
           </div>
+          <div id="unify-card" role="region" aria-label="Unlock the ultimate AI subscription"
+               style="position:fixed;right:16px;bottom:16px;width:428px;height:80px">
+            <div><p>Unlock the ultimate AI subscription</p><p>Get benefits in Grok, Cursor and X</p></div>
+            <span aria-hidden="true">See plans</span>
+            <a href="https://accounts.x.ai/unify?redirect=grok-com&amp;src=grok_web_new_chat_card" aria-label="See plans"
+               style="position:absolute;inset:0"></a>
+            <span><button type="button" aria-label="Dismiss">x</button></span>
+          </div>
+          <div id="unify-elsewhere" role="region" aria-label="Plans">
+            <p>Manage your plan</p>
+            <a href="https://accounts.x.ai/unify?redirect=grok-com&amp;src=grok_web_settings_billing_banner">See plans</a>
+          </div>
         </body>
         </html>
         """
@@ -2582,7 +2589,52 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(marks["buildMode"], true)
         XCTAssertEqual(marks["buildModeDialog"], false)
         XCTAssertEqual(marks["otherPopover"], false)
+        XCTAssertEqual(marks["unifyCard"], true)
+        XCTAssertEqual(marks["unifyElsewhere"], false)
         XCTAssertEqual(marks["noPromoClick"], true)
+    }
+
+    /// Search, and See all under Chats, open grok.com's command menu. It used
+    /// to be a centered dialog that grew under the titlebar; now it's anchored
+    /// at 18vh. Only the centered form may move.
+    @MainActor
+    func testCommandMenuInsetMovesOnlyTheCenteredDialog() async throws {
+        let html = """
+        <!DOCTYPE html>
+        <html>
+        <body style="margin:0">
+          <div id="anchored" role="dialog" class="fixed top-[18vh] translate-y-0"
+               style="position:fixed;left:50%;top:18vh;transform:translateX(-50%);width:600px;height:400px">
+            <div cmdk-root><input cmdk-input><div cmdk-list></div></div>
+          </div>
+          <div id="centered" role="dialog" class="fixed top-[50%] translate-y-[-50%]"
+               style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:600px;height:900px">
+            <div cmdk-root><input cmdk-input><div cmdk-list></div></div>
+          </div>
+        </body>
+        </html>
+        """
+        let result = try await evaluateChromeFixture(html: html, url: "https://grok.com/", script: """
+        (function () {
+          if (window.__grockChrome && window.__grockChrome.set) window.__grockChrome.set();
+          function edges(id) {
+            var r = document.getElementById(id).getBoundingClientRect();
+            return [r.top, r.bottom];
+          }
+          return { anchored: edges('anchored'), centered: edges('centered'), height: window.innerHeight };
+        })()
+        """)
+        func edges(_ key: String) -> [Double] {
+            (result[key] as? [NSNumber])?.map(\.doubleValue) ?? []
+        }
+        let height = (result["height"] as? NSNumber)?.doubleValue ?? 0
+        XCTAssertEqual(height, 600, accuracy: 1)
+        // grok.com's own placement, untouched.
+        XCTAssertEqual(edges("anchored").first ?? -1, 0.18 * height, accuracy: 1)
+        XCTAssertEqual(edges("anchored").last ?? -1, 0.18 * height + 400, accuracy: 1)
+        // Shifted and capped: 16px below the 52px titlebar, 16px above the bottom.
+        XCTAssertGreaterThanOrEqual(edges("centered").first ?? -1, 52 + 16 - 1)
+        XCTAssertLessThanOrEqual(edges("centered").last ?? .infinity, height - 16 + 1)
     }
 
     /// Session column, not New Chat home: collapsed in-page nav (height 0,
@@ -3654,6 +3706,43 @@ final class GrockTests: XCTestCase {
 
     @MainActor
     private func evaluatePromoMarks(html: String) async throws -> [String: Bool] {
+        let script = """
+        (function () {
+          if (window.__grockChrome && window.__grockChrome.set) window.__grockChrome.set();
+          function hidden(id) {
+            var el = document.getElementById(id);
+            if (!el) return false;
+            return !!(el.hasAttribute('data-grock-hide')
+              || el.querySelector('[data-grock-hide]')
+              || el.closest('[data-grock-hide]'));
+          }
+          function undrawn(id) {
+            return getComputedStyle(document.getElementById(id)).display === 'none';
+          }
+          return {
+            finance: hidden('finance-promo'),
+            imagine: hidden('imagine-promo'),
+            tos: hidden('tos-dialog'),
+            billing: hidden('billing-toast'),
+            xConnect: hidden('x-connect'),
+            grokBot: hidden('grok-bot-promo'),
+            buildMode: undrawn('build-mode-promo'),
+            buildModeDialog: undrawn('build-mode-dialog'),
+            otherPopover: undrawn('other-popover'),
+            unifyCard: undrawn('unify-card'),
+            unifyElsewhere: undrawn('unify-elsewhere'),
+            noPromoClick: window.promoClicked !== true
+          };
+        })()
+        """
+        let result = try await evaluateChromeFixture(html: html, url: "https://grok.com/", script: script)
+        return result.mapValues { ($0 as? NSNumber)?.boolValue ?? false }
+    }
+
+    /// Loads `html` at `url` with the production chrome script in an 800×600
+    /// window and returns what `script` evaluates to.
+    @MainActor
+    private func evaluateChromeFixture(html: String, url: String, script: String) async throws -> [String: Any] {
         let config = WKWebViewConfiguration()
         config.userContentController.addUserScript(
             WKUserScript(
@@ -3672,68 +3761,27 @@ final class GrockTests: XCTestCase {
         window.contentView = webView
         window.orderFront(nil)
         webView.layoutSubtreeIfNeeded()
-        let loaded = expectation(description: "promo-html")
+        let loaded = expectation(description: "chrome-fixture")
         let loader = PlaceTitleHTMLLoader(expectation: loaded)
         webView.navigationDelegate = loader
-        webView.loadHTMLString(html, baseURL: URL(string: "https://grok.com/"))
+        webView.loadHTMLString(html, baseURL: URL(string: url))
         await fulfillment(of: [loaded], timeout: 4)
-        let script = """
-        (function () {
-          if (window.__grockChrome && window.__grockChrome.set) window.__grockChrome.set();
-          function hidden(id) {
-            var el = document.getElementById(id);
-            if (!el) return false;
-            return !!(el.hasAttribute('data-grock-hide')
-              || el.querySelector('[data-grock-hide]')
-              || el.closest('[data-grock-hide]'));
-          }
-          return {
-            finance: hidden('finance-promo'),
-            imagine: hidden('imagine-promo'),
-            tos: hidden('tos-dialog'),
-            billing: hidden('billing-toast'),
-            xConnect: hidden('x-connect'),
-            grokBot: hidden('grok-bot-promo'),
-            buildMode: getComputedStyle(document.getElementById('build-mode-promo')).display === 'none',
-            buildModeDialog: getComputedStyle(document.getElementById('build-mode-dialog')).display === 'none',
-            otherPopover: getComputedStyle(document.getElementById('other-popover')).display === 'none',
-            noPromoClick: window.promoClicked !== true
-          };
-        })()
-        """
+        _ = window
         return try await withCheckedThrowingContinuation { continuation in
             webView.evaluateJavaScript(script) { result, error in
                 if let error {
                     continuation.resume(throwing: error)
-                    return
-                }
-                guard let dict = result as? [String: Any] else {
+                } else if let dict = result as? [String: Any] {
+                    continuation.resume(returning: dict)
+                } else {
                     continuation.resume(
                         throwing: NSError(
                             domain: "GrockTests",
                             code: 1,
-                            userInfo: [NSLocalizedDescriptionKey: "promo marks were not a dictionary"]
+                            userInfo: [NSLocalizedDescriptionKey: "fixture script did not return a dictionary"]
                         )
                     )
-                    return
                 }
-                func flag(_ key: String) -> Bool {
-                    if let value = dict[key] as? Bool { return value }
-                    if let value = dict[key] as? NSNumber { return value.boolValue }
-                    return false
-                }
-                continuation.resume(returning: [
-                    "finance": flag("finance"),
-                    "imagine": flag("imagine"),
-                    "tos": flag("tos"),
-                    "billing": flag("billing"),
-                    "xConnect": flag("xConnect"),
-                    "grokBot": flag("grokBot"),
-                    "buildMode": flag("buildMode"),
-                    "buildModeDialog": flag("buildModeDialog"),
-                    "otherPopover": flag("otherPopover"),
-                    "noPromoClick": flag("noPromoClick")
-                ])
             }
         }
     }

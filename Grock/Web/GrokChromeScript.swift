@@ -273,7 +273,11 @@ extension WebViewStore {
         // the card is taller than the viewport and sits under the overlay
         // titlebar. 32px is 16px air below the bar plus 16px from the
         // bottom once max-height binds. 136px is that plus header and footer.
-        var dialog = '[role="dialog"]:has([cmdk-root],[cmdk-list],[cmdk-input])';
+        // grok.com's command variant now anchors it at top-[18vh] with
+        // translate-y-0 and max-h-[72vh], which clears the bar at the 520pt
+        // minimum window. Shifting that one by half the viewport put it
+        // half off-screen, so only the centered form moves.
+        var dialog = '[role="dialog"]:has([cmdk-root],[cmdk-list],[cmdk-input]):not(.translate-y-0)';
         return dialog
           + '{top:calc(50% + (var(--grock-titlebar) / 2))!important;'
           + 'max-height:calc(100dvh - var(--grock-titlebar) - 32px)!important;'
@@ -287,13 +291,17 @@ extension WebViewStore {
         // First-paint net so campaign cards never draw. JS markPromos is the
         // precise pass. The named Build Mode announcement is a nonmodal
         // popover; hide its wrapper too so its arrow cannot remain visible.
+        // The New Chat subscription card rotates its title, but its See plans
+        // link always carries grok.com's source tag for that one card.
         return 'div.w-full.flex.justify-center.mt-2.px-2.cursor-pointer:has(button)'
           + ':not([role="dialog"]):not(form){display:none!important;}'
           + 'div.fixed.z-50:has(button[aria-label="Dismiss"])'
           + ':not([role="dialog"]):not(form){display:none!important;}'
           + '[data-radix-popper-content-wrapper]:has(> [role="dialog"]'
           + '[aria-label="Introducing Build Mode"]:not([aria-modal="true"]))'
-          + '{display:none!important;}';
+          + '{display:none!important;}'
+          + ':has(> a[href*="src=grok_web_new_chat_card"])'
+          + ':not([role="dialog"]):not(form){display:none!important;}';
       }
 
       function pluginsDialogInsetCSS() {
