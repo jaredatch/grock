@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Set the marketing version and bump the build number everywhere they live.
 # Sparkle compares build numbers, so every release needs a new one.
-# The CHANGELOG entry is still yours to write.
+# The CHANGELOG entry is still yours to write. Pushing the tag releases it.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -41,4 +41,4 @@ for edit in "${EDITS[@]}"; do
 done
 
 echo "Grock $OLD ($BUILD) -> $NEW ($NEXT)"
-echo 'Next: add a dated CHANGELOG entry, then run the build and test scripts.'
+echo "Next: add a dated '## $NEW' CHANGELOG section, run the build and test scripts, commit, push, then tag and push v$NEW."

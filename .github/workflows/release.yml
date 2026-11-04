@@ -1,0 +1,201 @@
+name: Release
+
+# Push a vX.Y.Z tag and this builds, signs, notarizes, and publishes it:
+# GitHub Release, then the Sparkle feed, then the Homebrew cask.
+# docs/RELEASING.md has the one-time setup.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # It signs with our Developer ID and Sparkle keys, so forks never run it.
+    if: github.repository == 'jaredatch/grock'
+    runs-on: macos-26
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: write
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the tag
+        run: |
+          set -euo pipefail
+          version="$(sed -nE 's/^ *MARKETING_VERSION: "([0-9.]+)"$/\1/p' project.yml)"
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::$TAG doesn't match MARKETING_VERSION $version in project.yml. Run script/bump.sh first."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/master; then
+            echo "::error::$TAG isn't on master."
+            exit 1
+          fi
+          awk -v v="$version" '$1 == "##" { if (found) exit; found = ($2 == v); next } found' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::error::CHANGELOG.md has no '## $version' section."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Read the live appcast
+        # Build on the feed that's live on master, not the tag's copy, so a
+        # release never drops an entry published after its tag was cut.
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/contents/appcast.xml?ref=master" > "$RUNNER_TEMP/appcast.json"
+          python3 -c 'import base64, json, sys; d = json.load(open(sys.argv[1])); open("appcast.xml", "wb").write(base64.b64decode(d["content"])); print("APPCAST_SHA=" + d["sha"])' \
+            "$RUNNER_TEMP/appcast.json" >> "$GITHUB_ENV"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build, sign, and notarize
+        env:
+          DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_API_KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          # The keys live in a throwaway keychain and folder that are gone when
+          # this step ends, pass or fail.
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          keychain_password="$(uuidgen)"
+          keys="$(mktemp -d "$RUNNER_TEMP/keys.XXXXXX")"
+          cleanup() {
+            security delete-keychain "$keychain" >/dev/null 2>&1 || true
+            rm -rf "$keys"
+          }
+          trap cleanup EXIT
+
+          printf '%s' "$DEVELOPER_ID_P12" | base64 --decode > "$keys/developer-id.p12"
+          printf '%s\n' "$NOTARY_API_KEY_P8" > "$keys/notary.p8"
+          printf '%s\n' "$SPARKLE_PRIVATE_KEY" > "$keys/sparkle.key"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security import "$keys/developer-id.p12" -k "$keychain" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application: .*\)".*/\1/p' | head -n 1)"
+          if [ -z "$identity" ]; then
+            echo "::error::DEVELOPER_ID_P12 has no Developer ID Application identity."
+            exit 1
+          fi
+
+          ./script/release.sh --identity "$identity" \
+            --notary-key "$keys/notary.p8" --notary-key-id "$NOTARY_KEY_ID" --notary-issuer "$NOTARY_ISSUER_ID" \
+            --sparkle-key "$keys/sparkle.key"
+
+      - name: Publish
+        run: |
+          set -euo pipefail
+          zip="$(echo DerivedData/ReleaseArtifacts/run.*/"Grock-$VERSION-arm64.zip")"
+          if [ ! -f "$zip" ]; then
+            echo "::error::No release ZIP for $VERSION."
+            exit 1
+          fi
+          notes="$RUNNER_TEMP/notes.md"
+          # shellcheck disable=SC2016 # the backticks are Markdown
+          printf '\n**Install:** download `%s`, unzip it, and drag Grock to Applications. Already have Grock? Choose Check for Updates… in the Grock menu.\n' \
+            "$(basename "$zip")" >> "$notes"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # A rerun after the feed step failed. The feed doesn't point at
+            # these assets yet (release.sh checked), so replacing them is safe.
+            gh release upload "$TAG" "$zip" "$zip.sha256" --clobber
+          else
+            gh release create "$TAG" "$zip" "$zip.sha256" --verify-tag --title "Grock $VERSION" --notes-file "$notes"
+          fi
+          # The feed goes live last, once its download exists. The sha makes
+          # this fail rather than overwrite a feed that changed during the run.
+          gh api --silent -X PUT "repos/$GH_REPO/contents/appcast.xml" \
+            -f message="chore(release): publish $VERSION appcast" \
+            -f branch=master -f sha="$APPCAST_SHA" -f content="$(base64 -i appcast.xml)"
+
+  cask:
+    # Homebrew can't download from a private repo, so this waits until it's public.
+    if: github.repository == 'jaredatch/grock' && !github.event.repository.private
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Update the Homebrew cask
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN isn't set, so the cask wasn't updated."
+            exit 1
+          fi
+          version="${TAG#v}"
+          sha256="$(gh release download "$TAG" --pattern '*.sha256' --output - | awk '{print $1}')"
+          if ! [[ "$sha256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::Couldn't read the ZIP checksum from the $TAG release."
+            exit 1
+          fi
+          cat > grock.rb <<CASK
+          # typed: strict
+          # frozen_string_literal: true
+
+          cask "grock" do
+            version "$version"
+            sha256 "$sha256"
+
+            url "https://github.com/jaredatch/grock/releases/download/v#{version}/Grock-#{version}-arm64.zip"
+            name "Grock"
+            desc "Launcher for grok.com with a global hotkey and Quick Chat"
+            homepage "https://github.com/jaredatch/grock"
+
+            livecheck do
+              url "https://raw.githubusercontent.com/jaredatch/grock/master/appcast.xml"
+              strategy :sparkle
+            end
+
+            auto_updates true
+            depends_on arch: :arm64
+            depends_on macos: :tahoe
+
+            app "Grock.app"
+            binary "#{appdir}/Grock.app/Contents/SharedSupport/grock"
+
+            zap trash: [
+              "~/Library/Application Scripts/com.jaredatch.Grock",
+              "~/Library/Containers/com.jaredatch.Grock",
+            ]
+          end
+          CASK
+          cask="repos/jaredatch/homebrew-tap/contents/Casks/grock.rb"
+          # No sha means the cask doesn't exist yet. Any other read failure
+          # makes the write below fail too.
+          existing="$(GH_TOKEN="$TAP_TOKEN" gh api "$cask" --jq .sha 2>/dev/null || true)"
+          args=(--silent -X PUT "$cask" -f message="cask: $TAG" -f content="$(base64 -w0 grock.rb)")
+          if [ -n "$existing" ]; then args+=(-f sha="$existing"); fi
+          GH_TOKEN="$TAP_TOKEN" gh api "${args[@]}"

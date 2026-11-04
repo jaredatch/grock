@@ -49,7 +49,7 @@ Injected scripts follow two rules. First, they stay idle when grok.com is idle. 
 | Native handlers | Accept messages only from the main HTTPS grok.com frame. Navigation revokes download authorization. |
 | Sending | No code path sends a message without the user pressing Return or Send. |
 | XcodeGen | Edit `project.yml`, run `xcodegen generate`. Never hand-edit `Grock.xcodeproj`, `Info.plist`, or `Grock.entitlements`; all three are generated. |
-| Scripts | Build and test through `script/build_and_run.sh` and `script/test.sh`. Release through `script/release.sh`. |
+| Scripts | Build and test through `script/build_and_run.sh` and `script/test.sh`. Release by pushing a version tag; `.github/workflows/release.yml` runs `script/release.sh` and publishes (see `docs/RELEASING.md`). |
 | AppKit bridges | Panel, status item, hotkeys, and Quick Chat are AppKit. Keep them narrow. Settings panes are SwiftUI. |
 
 ## Presentation

@@ -5,6 +5,10 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 IDENTITY=""
 PROFILE=""
+NOTARY_KEY=""
+NOTARY_KEY_ID=""
+NOTARY_ISSUER=""
+SPARKLE_KEY=""
 LOCAL=0
 SIGN_ONLY=0
 usage() {
@@ -12,30 +16,47 @@ usage() {
 usage: ./script/release.sh --local
        ./script/release.sh --identity 'Developer ID Application: …' --sign-only
        ./script/release.sh --identity 'Developer ID Application: …' --notary-profile PROFILE
+       ./script/release.sh --identity 'Developer ID Application: …' \
+         --notary-key AuthKey.p8 --notary-key-id KEY_ID --notary-issuer ISSUER_ID [--sparkle-key FILE]
 
 --local signs ad hoc for sandbox testing; its output is not distributable.
 --sign-only verifies a Developer ID build without uploading it to Apple.
 The full workflow notarizes and staples the app, then creates a ZIP, a checksum, and the Sparkle appcast.
-Credentials stay in the named notarytool Keychain profile.
+On a desktop Mac, credentials stay in a notarytool Keychain profile and the Sparkle key in Keychain.
+The release workflow passes an App Store Connect API key and an exported Sparkle key as files instead.
 USAGE
 }
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --local) LOCAL=1; shift ;;
     --sign-only) SIGN_ONLY=1; shift ;;
-    --identity|--notary-profile)
+    --identity|--notary-profile|--notary-key|--notary-key-id|--notary-issuer|--sparkle-key)
       [ "$#" -ge 2 ] && [ -n "$2" ] || { usage >&2; exit 64; }
       case "$1" in
         --identity) IDENTITY="$2" ;;
         --notary-profile) PROFILE="$2" ;;
+        --notary-key) NOTARY_KEY="$2" ;;
+        --notary-key-id) NOTARY_KEY_ID="$2" ;;
+        --notary-issuer) NOTARY_ISSUER="$2" ;;
+        --sparkle-key) SPARKLE_KEY="$2" ;;
       esac
       shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 64 ;;
   esac
 done
+NOTARY_API="$NOTARY_KEY$NOTARY_KEY_ID$NOTARY_ISSUER"
+if [ -n "$NOTARY_API" ]; then
+  [ -n "$NOTARY_KEY" ] && [ -n "$NOTARY_KEY_ID" ] && [ -n "$NOTARY_ISSUER" ] && [ -z "$PROFILE" ] \
+    || { echo 'release: --notary-key, --notary-key-id, and --notary-issuer go together, in place of --notary-profile' >&2; exit 64; }
+  [ -f "$NOTARY_KEY" ] || { echo "release: no notary key at $NOTARY_KEY" >&2; exit 64; }
+  NOTARY_AUTH=(--key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER")
+elif [ -n "$PROFILE" ]; then
+  NOTARY_AUTH=(--keychain-profile "$PROFILE")
+fi
+[ -z "$SPARKLE_KEY" ] || [ -f "$SPARKLE_KEY" ] || { echo "release: no Sparkle key at $SPARKLE_KEY" >&2; exit 64; }
 if [ "$LOCAL" -eq 1 ]; then
-  [ -z "$IDENTITY$PROFILE" ] && [ "$SIGN_ONLY" -eq 0 ] || { usage >&2; exit 64; }
+  [ -z "$IDENTITY$PROFILE$NOTARY_API$SPARKLE_KEY" ] && [ "$SIGN_ONLY" -eq 0 ] || { usage >&2; exit 64; }
   IDENTITY="-"
 else
   case "$IDENTITY" in
@@ -43,9 +64,9 @@ else
     *) echo 'release: provide a Developer ID Application identity, or use --local' >&2; exit 64 ;;
   esac
   if [ "$SIGN_ONLY" -eq 1 ]; then
-    [ -z "$PROFILE" ] || { usage >&2; exit 64; }
+    [ -z "$PROFILE$NOTARY_API$SPARKLE_KEY" ] || { usage >&2; exit 64; }
   else
-    [ -n "$PROFILE" ] || { echo 'release: --notary-profile is required (or use --sign-only)' >&2; exit 64; }
+    [ -n "$PROFILE$NOTARY_API" ] || { echo 'release: notarizing needs --notary-profile or the --notary-key options (or use --sign-only)' >&2; exit 64; }
   fi
 fi
 
@@ -53,9 +74,9 @@ command -v xcodegen >/dev/null || { echo 'release: install XcodeGen first' >&2; 
 command -v python3 >/dev/null || { echo 'release: python3 is required for verification' >&2; exit 1; }
 SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
 [ "${SDK_VERSION%%.*}" -ge 26 ] || { echo 'release: Xcode with the macOS 26 SDK or newer is required' >&2; exit 1; }
-if [ -n "$PROFILE" ]; then
-  # Validate the stored profile before spending time on the build. No credential output.
-  xcrun notarytool history --keychain-profile "$PROFILE" --output-format json >/dev/null
+if [ -n "$PROFILE$NOTARY_API" ]; then
+  # Check the notary credentials before spending time on the build. No credential output.
+  xcrun notarytool history "${NOTARY_AUTH[@]}" --output-format json >/dev/null
 fi
 
 cd "$REPO"
@@ -69,6 +90,17 @@ xcodebuild build -scheme Grock -configuration Release \
 
 APP="$OUTPUT/Grock.app"
 ditto "$DERIVED/Build/Products/Release/Grock.app" "$APP"
+if [ "$LOCAL" -eq 0 ] && [ "$SIGN_ONLY" -eq 0 ] && [ -f "$REPO/appcast.xml" ]; then
+  # Sparkle compares build numbers. A build that isn't above everything in
+  # the feed is an update nobody gets.
+  python3 - "$REPO/appcast.xml" "$APP/Contents/Info.plist" <<'PY'
+import plistlib, sys, xml.etree.ElementTree as ET
+build = int(plistlib.load(open(sys.argv[2], 'rb'))['CFBundleVersion'])
+shipped = [int(v.text) for v in ET.parse(sys.argv[1]).iter('{http://www.andymatuschak.org/xml-namespaces/sparkle}version')]
+if shipped and build <= max(shipped):
+    raise SystemExit(f'release: build {build} is not above build {max(shipped)} in appcast.xml; run script/bump.sh')
+PY
+fi
 SIGN_ARGS=(--force --sign "$IDENTITY" --options runtime)
 if [ "$LOCAL" -eq 1 ]; then
   SIGN_ARGS+=(--timestamp=none)
@@ -102,7 +134,7 @@ fi
 ZIP_ARGS=(-c -k --norsrc --noextattr --noacl --keepParent)
 UPLOAD="$OUTPUT/notary-upload.zip"
 ditto "${ZIP_ARGS[@]}" "$APP" "$UPLOAD"
-xcrun notarytool submit "$UPLOAD" --keychain-profile "$PROFILE" --wait \
+xcrun notarytool submit "$UPLOAD" "${NOTARY_AUTH[@]}" --wait \
   --output-format json > "$OUTPUT/notarization.json"
 python3 - "$OUTPUT/notarization.json" <<'PY'
 import json, sys
@@ -128,18 +160,23 @@ python3 "$REPO/script/verify_release.py" "$EXTRACTED/Grock.app" --distribution -
 rm -rf "$EXTRACTED"
 rm "$UPLOAD"
 
-# Appcast. generate_appcast signs the ZIP with the Grock EdDSA key in Keychain
-# and merges the entry into the published appcast so older items survive.
+# Appcast. generate_appcast signs the ZIP with the Grock EdDSA key (Keychain, or
+# --sparkle-key) and merges the entry into the published appcast so older items
+# survive. Only this run's verified ZIP goes in the folder, so the key never
+# signs anything else.
 GENERATE_APPCAST="$(find "$DERIVED/SourcePackages/artifacts/sparkle/Sparkle/bin" -name generate_appcast -type f | head -n 1)"
 [ -n "$GENERATE_APPCAST" ] || { echo 'release: could not find Sparkle generate_appcast' >&2; exit 1; }
 APPCAST_DIR="$OUTPUT/appcast"
 mkdir -p "$APPCAST_DIR"
 ln "$ZIP" "$APPCAST_DIR/$(basename "$ZIP")"
 [ -f "$REPO/appcast.xml" ] && cp "$REPO/appcast.xml" "$APPCAST_DIR/appcast.xml"
-"$GENERATE_APPCAST" --account Grock \
+SIGNING_KEY=(--account Grock)
+[ -z "$SPARKLE_KEY" ] || SIGNING_KEY=(--ed-key-file "$SPARKLE_KEY")
+"$GENERATE_APPCAST" "${SIGNING_KEY[@]}" \
   --download-url-prefix "https://github.com/jaredatch/grock/releases/download/v$VERSION/" \
   --link "https://github.com/jaredatch/grock" \
   "$APPCAST_DIR"
+xcrun swift "$REPO/script/verify_update.swift" "$APPCAST_DIR/appcast.xml" "$ZIP" "$APP"
 cp "$APPCAST_DIR/appcast.xml" "$REPO/appcast.xml"
 echo "VERIFIED RELEASE: $ZIP"
 echo "APPCAST UPDATED: $REPO/appcast.xml (commit it after the GitHub Release is up)"

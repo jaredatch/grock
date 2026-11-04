@@ -177,3 +177,9 @@ A path in a custom URL tells Grock where a file is; it doesn't let a sandboxed a
 Integrations that only know a path can still use `file=`. If access fails, Grock keeps the draft and offers Choose File. Selecting the requested file retries the whole addition. Cancel keeps it pending, and Continue Without Them explicitly drops it. Missing files and size errors remain separate errors. A recovered `new` request stages in the overlay; `ask` stays in Quick Chat. Neither sends.
 
 The cost is a picker for callers that can't transfer access, plus limits on bookmark and URL size. Bookmark data is a temporary file-access capability, so we keep it out of logs and persistent storage. A signed sandbox regression runs with the full test suite because an unsigned test host can't prove this works.
+
+## DEC-069. A tag ships the release
+
+Releases used to be built on one Mac's desktop, because signing and notarizing needed its Keychain prompts, and then published by hand in an order that's easy to get wrong. Now pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml` on a GitHub macOS runner. It signs with the Developer ID certificate from a throwaway keychain, notarizes with an App Store Connect API key, signs the update with the Sparkle key, and publishes the GitHub Release, then the feed, then the Homebrew cask. The secrets sit in a `release` environment that only `v*` tags can use. Before anything goes public, `script/verify_update.swift` checks the new feed entry against the public key inside the app, so a wrong key fails the run instead of every installed copy.
+
+Cost: the Developer ID and Sparkle private keys now live in GitHub, and anyone who can push a tag can ship an update. The clean-Mac test list becomes optional: run it when a release touches login, permissions, or file access, ideally on a hand-built copy before tagging.
