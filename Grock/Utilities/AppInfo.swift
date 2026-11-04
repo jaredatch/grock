@@ -5,7 +5,7 @@ import Foundation
 enum AppInfo {
     /// Marketing version. Keep in lockstep with
     /// `project.yml` `MARKETING_VERSION` (DEC-016).
-    static let expectedMarketingVersion = "1.0.0"
+    static let expectedMarketingVersion = "1.0.1"
 
     /// `NSHumanReadableCopyright`. About and Finder Get Info. The MIT
     /// copyright notice stays in LICENSE, not on this panel (DEC-016).

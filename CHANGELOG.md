@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 (2026-11-04)
+
+Maintenance release. Updates are now built, signed, and published automatically, and this is the first one shipped that way. If Grock 1.0.0 offered you this version and installed it, the updater works end to end. Nothing else in the app changes.
+
 ## 1.0.0 (2026-10-01)
 
 First public release. Grock is a native macOS launcher for grok.com, and this is everything it does on day one:
