@@ -171,7 +171,7 @@ jobs:
 
             url "https://github.com/jaredatch/grock/releases/download/v#{version}/Grock-#{version}-arm64.zip"
             name "Grock"
-            desc "Launcher for grok.com with a global hotkey and Quick Chat"
+            desc "Desktop app for grok.com with a global hotkey and Quick Chat"
             homepage "https://github.com/jaredatch/grock"
 
             livecheck do
