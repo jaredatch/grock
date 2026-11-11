@@ -7,10 +7,9 @@ enum PanelGeometry {
     static let defaultContentSize = NSSize(width: 920, height: 680)
     static let minContentSize = NSSize(width: 720, height: 520)
     static let fallbackTitlebarInset: CGFloat = 52
-    /// Extra fade below the bar so thread text eases out as it scrolls under.
-    static let titlebarFadeExtra: CGFloat = 28
-    /// grok.com full sidebar (`--sidebar-width: 16rem`). Used to park the
-    /// native sidebar toggle on the rail's trailing edge (Notes / Mail).
+    /// grok.com's sidebar at its default width (254pt, rounded). Used to park
+    /// the native sidebar toggle on its trailing edge (Notes / Mail). The
+    /// page's resize handle is muted so the two stay lined up.
     static let grokSidebarWidth: CGFloat = 256
     /// Gap between the open rail and the first content-column title. Matches
     /// the usual Tahoe spacing between two titlebar capsules.
@@ -247,10 +246,14 @@ enum TitleDestination: Int, CaseIterable {
     static func rebuildMenu(
         _ menu: NSMenu,
         pref: ChromePreference.Snapshot = ChromePreference.current,
+        signedIn: Bool = true,
         target: AnyObject,
         action: Selector
     ) {
         menu.removeAllItems()
+        // Signed out, every place but the start page is a sign-in wall.
+        // New Chat stays: it is also the way back from a provider's page.
+        menu.autoenablesItems = signedIn
         let available = available(in: pref)
         func add(_ destination: TitleDestination) {
             let item = NSMenuItem(
@@ -265,6 +268,7 @@ enum TitleDestination: Int, CaseIterable {
                 accessibilityDescription: destination.title
             )
             item.image?.isTemplate = true
+            item.isEnabled = signedIn || destination == .newChat
             menu.addItem(item)
         }
         if available.contains(.newChat) {
@@ -312,10 +316,10 @@ extension NSToolbarItem.Identifier {
 
 /// Overlay panel with a real system titlebar.
 ///
-/// Titlebar sits on the WebView (`fullSizeContentView`). The sidebar rail
-/// is padded in CSS; the chat column pads its first scrolling child so
-/// text can pass under the bar. The fade is in-page (`#grock-titlebar-fade`)
-/// because WKWebView's remote layer covers sibling NSViews (DEC-027, DEC-030).
+/// Titlebar sits on the WebView (`fullSizeContentView`). grok.com keeps a
+/// 56px band of its own chrome at the top of every view and fades the thread
+/// out under it, so the bar rests in that band and the page script only
+/// hides the controls the bar replaces (DEC-071).
 /// We still zero WebKit safe-area — that was the old corner-hairline path.
 ///
 /// Not a permanently floating / nonactivating panel: summon brings it forward;
@@ -790,6 +794,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
         guard menu === titleMenu else { return }
         TitleDestination.rebuildMenu(
             menu,
+            signedIn: WebViewStore.shared.isSignedIn,
             target: self,
             action: #selector(titleMenuChosen(_:))
         )
@@ -895,6 +900,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
 
     @objc private func titleMenuChosen(_ sender: NSMenuItem) {
         guard let destination = TitleDestination(rawValue: sender.tag) else { return }
+        guard destination == .newChat || WebViewStore.shared.isSignedIn else { return }
         Task { @MainActor in
             switch destination {
             case .newChat:
@@ -990,13 +996,13 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
             sessionMoreMenu.addItem(pin)
         }
         if actions.more && sessionProjectAvailable {
-            let project = NSMenuItem(title: "Move to Project…", action: #selector(toolbarSessionProject), keyEquivalent: "")
+            let project = NSMenuItem(title: "Add to Project…", action: #selector(toolbarSessionProject), keyEquivalent: "")
             project.target = self
             sessionMoreMenu.addItem(project)
         }
         if actions.panel {
             let panel = NSMenuItem(
-                title: "Toggle Right Panel",
+                title: "Toggle Right Pane",
                 action: #selector(toolbarSessionPanel),
                 keyEquivalent: ""
             )
@@ -1007,16 +1013,17 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
             if !sessionMoreMenu.items.isEmpty {
                 sessionMoreMenu.addItem(.separator())
             }
-            let deleteItem = NSMenuItem(title: "Delete Chat", action: #selector(toolbarSessionDelete), keyEquivalent: "")
-            deleteItem.target = self
-            deleteItem.attributedTitle = NSAttributedString(
-                string: "Delete Chat",
+            // grok.com's menu ends in Archive, in red. It used to be Delete.
+            let archive = NSMenuItem(title: "Archive", action: #selector(toolbarSessionArchive), keyEquivalent: "")
+            archive.target = self
+            archive.attributedTitle = NSAttributedString(
+                string: "Archive",
                 attributes: [
                     .foregroundColor: NSColor.systemRed,
                     .font: NSFont.menuFont(ofSize: NSFont.systemFontSize)
                 ]
             )
-            sessionMoreMenu.addItem(deleteItem)
+            sessionMoreMenu.addItem(archive)
         }
     }
 
@@ -1094,8 +1101,8 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
         WebViewStore.shared.clickSessionAction("panel")
     }
 
-    @objc private func toolbarSessionDelete() {
-        WebViewStore.shared.clickSessionAction("delete")
+    @objc private func toolbarSessionArchive() {
+        WebViewStore.shared.clickSessionAction("archive")
     }
 
     /// Hosts the shared WKWebView flush in the window, plus a drag strip
@@ -1125,7 +1132,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
         }
         let webTop = webView.topAnchor.constraint(equalTo: host.topAnchor)
         webViewTop = webTop
-        showingAuthPage = NavigationPolicy.isAuthHost(webView.url?.host)
+        showingAuthPage = NavigationPolicy.isSignInHost(webView.url?.host)
         NSLayoutConstraint.activate([
             webView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
@@ -1276,6 +1283,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
         let webInset = showingAuthPage ? inset : 0
         if webViewTop?.constant != webInset {
             webViewTop?.constant = webInset
+            WebViewStore.shared.markViewportUnitsStale()
         }
         sidebarButtonCenterY?.constant = inset / 2
         applyRailIndentWidth()
@@ -1314,7 +1322,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
         WebViewStore.shared.handlePageURLChanged(webView.url)
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.showingAuthPage = NavigationPolicy.isAuthHost(webView.url?.host)
+            self.showingAuthPage = NavigationPolicy.isSignInHost(webView.url?.host)
             self.syncTitlebarDragHeight()
             WebViewStore.shared.applyChrome()
             self.sessionPinned = nil

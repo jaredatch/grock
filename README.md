@@ -33,7 +33,7 @@ You need macOS 26 or later on Apple silicon, plus a grok.com account (free or Su
 
 **A badge when the answer lands.** Ask something heavy and go back to work. If you aren't looking when Grok finishes, the Dock icon gets a `1` and the menu bar icon changes. Click the Dock icon or use Show Grock, and you're scrolled straight to the answer.
 
-**A titlebar, not a browser frame.** The sidebar toggle, the chat title, New Chat, Private, and Search sit in a native toolbar over the page. Inside a conversation you also get More (pin, move to a project, delete) and Share. grok.com's sidebar starts hidden, and while it is, clicking the title copies the chat link, Option-click opens it in your browser, and the chevron beside it jumps to Imagine, Projects, History, and the rest. Appearance settings hide the parts of grok.com you don't use, like Imagine, Plugins, or voice mode.
+**A titlebar, not a browser frame.** The sidebar toggle, the chat title, New Chat, Private, and Search sit in a native toolbar over the page. Inside a conversation you also get More (pin, add to a project, archive) and Share. grok.com's sidebar starts hidden, and while it is, clicking the title copies the chat link, Option-click opens it in your browser, and the chevron beside it jumps to Imagine, Projects, History, and the rest. Appearance settings hide the parts of grok.com you don't use, like Projects, Plugins, or voice mode.
 
 **Four hotkeys, all yours to rebind.** Quick Chat (⌥Space out of the box), New Chat, Show Grock, and Voice Chat. The last three stay unset until you pick a shortcut. They're registered through Carbon, so Grock never asks for Accessibility access.
 
@@ -73,7 +73,7 @@ Raycast, Alfred, and Shortcuts can call the CLI for files or use the URL scheme 
 
 **Why macOS 26 only?** Quick Chat is built on Liquid Glass, and there's no fallback material we'd want to ship. Supporting releases we don't test is a promise we'd end up breaking.
 
-**Is my login safe?** You sign in on xAI's own page, and the session lives in Grock's WebKit cookie store inside its sandbox, separate from Safari's. Grock has no server and no telemetry. Apart from the pages you load, the only place it contacts is GitHub, to check for updates.
+**Is my login safe?** You sign in on grok.com's own page and your provider's (X, Apple, Google, or GitHub), all inside Grock, and the session lives in Grock's WebKit cookie store inside its sandbox, separate from Safari's. Grock has no server and no telemetry. Apart from the pages you load, the only place it contacts is GitHub, to check for updates.
 
 **Why is installing the CLI a Terminal step?** Grock is sandboxed and can't write to `/usr/local/bin` or `/opt/homebrew/bin` by itself. It shows you the exact command instead and notices when you come back.
 

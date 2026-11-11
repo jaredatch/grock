@@ -130,9 +130,9 @@ There is no Notification Center banner, no sound, and the badge never counts pas
 
 ## DEC-055. Conversation actions live in the titlebar
 
-On a chat, grok.com puts More, Share, and a panel toggle in its own header, which ends up underneath Grock's toolbar. We hide that cluster without removing it, so clicks can still reach it, and add More and Share as ordinary toolbar buttons beside New Chat and Private. More opens a native menu with Pin or Unpin, Move to Project, Toggle Right Panel when grok.com offers one, and Delete Chat. Each item drives the matching entry in grok.com's own menu. Share clicks grok.com's Share button, which publishes a public link; clicking the title still copies the private one.
+On a chat, grok.com puts a Conversation Actions menu and a right pane toggle in its own header, which ends up underneath Grock's toolbar. We hide them without removing them, so clicks can still reach them, and add More and Share as ordinary toolbar buttons beside New Chat and Private. More opens a native menu with Pin or Unpin, Add to Project, Toggle Right Pane, and Archive. Each item drives the matching entry in grok.com's own menu, which opens out of sight while we read it. Share drives that menu's Share item, which publishes a public link; clicking the title still copies the private one.
 
-Cost: this is DOM work, so a grok.com redesign can break it until we adapt. And Delete does whatever grok.com does, which right now means deleting at once with a short Undo toast, not asking first.
+Cost: this is DOM work, so a grok.com redesign can break it until we adapt. That happened in November 2026, when Delete became Archive and Share moved into the menu (DEC-071). Archive does whatever grok.com does, which right now means asking first in grok.com's own dialog.
 
 ## DEC-056. Web content gets a short leash
 
@@ -183,3 +183,30 @@ The cost is a picker for callers that can't transfer access, plus limits on book
 Releases used to be built on one Mac's desktop, because signing and notarizing needed its Keychain prompts, and then published by hand in an order that's easy to get wrong. Now pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml` on a GitHub macOS runner. It signs with the Developer ID certificate from a throwaway keychain, notarizes with an App Store Connect API key, signs the update with the Sparkle key, and publishes the GitHub Release, then the feed, then the Homebrew cask. The secrets sit in a `release` environment that only `v*` tags can use. Before anything goes public, `script/verify_update.swift` checks the new feed entry against the public key inside the app, so a wrong key fails the run instead of every installed copy.
 
 Cost: the Developer ID and Sparkle private keys now live in GitHub, and anyone who can push a tag can ship an update. The clean-Mac test list becomes optional: run it when a release touches login, permissions, or file access, ideally on a hand-built copy before tagging.
+
+## DEC-071. The titlebar sits in grok.com's own band
+
+In November 2026 grok.com replaced its whole front end. The markup we'd been matching (utility class names, sidebar attributes, a separate Imagine page) was gone overnight, and most of what Grock does to the page stopped working: the sidebar wouldn't hide, grok.com's own toggle and Search button showed up under the traffic lights, More and Share went missing, Search did nothing, and `grock://imagine` timed out.
+
+The new layout made most of our old page work unnecessary. grok.com now leaves a 56px band for its own chrome at the top of every view and fades a thread out underneath it. Grock's toolbar is 52pt, so it sits in that band. We deleted the code that hunted for the page's scroller and pushed content down, along with the in-page fade and the per-page layout fixes for Imagine, Library, Search, and Plugins. What's left of the chrome script hides the controls the toolbar replaces, hides what Appearance asks it to, and tells the toolbar what a page offers.
+
+Selectors match ids, roles, labels, and `data-` attributes. The new class names are hashed per build, so matching them would break with every grok.com deploy.
+
+Some things moved, and Grock follows:
+
+- Imagine is a mode of the main composer. `/imagine` lands on a new chat with an Imagine chip, so `grock imagine` and the title menu's Imagine go there and type after the chip.
+- Plugins and Automations are pages of grok.com's Settings. The title menu opens Settings on the right page.
+- The sidebar no longer lists Imagine or Automations, so those two Appearance switches only affect Grock's title menu now.
+- The page background is a warm off-white (near-black in dark mode). The window behind the page matches it.
+
+Cost: we still depend on markup we don't control, and the next redesign will break things again. This time the fix was mostly deletion, which won't always be true. The old layout isn't supported any more. grok.com serves the new one to everyone, signed in or not, so there was nothing left to test the old code against.
+
+## DEC-072. Sign-in stays in the app
+
+grok.com's Log in window now sends the page straight to X, Apple, Google, or GitHub, with grok.com named as the place to return to. Grock used to treat any x.com page as an outside link (DEC-032), so the consent page opened in your browser. You could approve it there, but that session belongs to the browser and never reaches the app, so there was no way to sign in.
+
+Grock now keeps a navigation in the WebView when it has that exact shape: it starts on grok.com, goes to one of those providers, and carries a `redirect_uri` back to grok.com. The provider's own pages (password, two-factor) stay too, until it hands you back. A plain link to x.com or github.com in an answer still opens in the browser.
+
+Signed out, there's one thing to do, so the page shows only Sign in. Grock hides grok.com's logo, Settings, Sign up, and Google's one-tap card, and the title menu offers only New Chat. The cookie notice is never touched.
+
+Cost: Sign up isn't on the page any more, though grok.com's Log in window still links to it. If you start signing in and change your mind, New Chat in the title menu is the way back. Only the X path has been run as far as its login page; Apple, Google, and GitHub follow the same rule but haven't been tried.

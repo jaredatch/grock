@@ -6,44 +6,299 @@ import XCTest
 @testable import Grock
 
 final class GrockTests: XCTestCase {
+    // MARK: - New chat, Search, Plugins, Private
+
+    /// A conversation page whose New chat controls record which one was clicked.
+    private static let freshSessionFixture = GrokShellFixture.page(
+        header: GrokShellFixture.conversationHeader,
+        outside: """
+        <script>
+          window.clicked = [];
+          ['new-chat', 'chats-new-chat', 'project-new-chat'].forEach(function (id) {
+            document.getElementById(id).addEventListener('click', function () { window.clicked.push(id); });
+          });
+        </script>
+        """
+    )
+
     @MainActor
-    func testFreshSessionScriptPrefersInPageNewChat() {
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("New Chat"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("Create New Chat"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("already-fresh"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("if (startPath()) return 'already-fresh'"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("findCreateNewChat"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("findHeaderNewChat"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("findChatHome"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("findProjectNewChat"))
-        XCTAssertFalse(WebViewStore.freshSessionScript.contains("function findSearch"))
-        XCTAssertFalse(WebViewStore.freshSessionScript.contains("composerEmpty(composer())"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("clicked"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("missing"))
-        XCTAssertTrue(WebViewStore.freshSessionScript.contains("[data-sidebar]"))
-        XCTAssertTrue(WebViewStore.clickImagineHomeScript.contains("Imagine"))
-        XCTAssertTrue(WebViewStore.clickImagineHomeScript.contains("/imagine"))
-        XCTAssertTrue(WebViewStore.clickImagineHomeScript.contains("clicked"))
-        XCTAssertTrue(WebViewStore.clickImagineHomeScript.contains("navigated"))
-        XCTAssertTrue(WebViewStore.clickImagineHomeScript.contains("isImagineHome"))
-        XCTAssertTrue(WebViewStore.clickImagineHomeScript.contains("already-home"))
-        XCTAssertFalse(WebViewStore.clickImagineHomeScript.contains("indexOf('/imagine/')"))
-        XCTAssertTrue(WebViewStore.newGenerationScript.contains("New Generation"))
-        XCTAssertTrue(WebViewStore.newGenerationScript.contains("already-home"))
-        let already = WebViewStore.newGenerationScript.range(
-            of: "if (imagineHome()) return 'already-home'"
+    func testFreshSessionClicksTheSidebarNewChatRow() async throws {
+        let run = try await runPageScripts(
+            [WebViewStore.freshSessionScript],
+            html: Self.freshSessionFixture,
+            url: "https://grok.com/c/fixture",
+            probe: "{ clicked: window.clicked, previousPath: window.__grockPreviousPath || '' }"
         )
-        let find = WebViewStore.newGenerationScript.range(of: "findNewGeneration")
-        XCTAssertNotNil(already)
-        XCTAssertNotNil(find)
-        XCTAssertLessThan(already!.lowerBound, find!.lowerBound)
-        XCTAssertTrue(WebViewStore.isImagineHome(URL(string: "https://grok.com/imagine")))
-        XCTAssertTrue(WebViewStore.isImagineHome(URL(string: "https://grok.com/imagine/")))
-        XCTAssertFalse(WebViewStore.isImagineHome(URL(string: "https://grok.com/imagine/saved")))
-        XCTAssertFalse(WebViewStore.isImagineHome(URL(string: "https://grok.com")))
-        let ready = WebViewStore.composerReadyScript(pathBefore: "/c/abc")
-        XCTAssertTrue(ready.contains("/c/abc"))
-        XCTAssertTrue(ready.contains("oldPath"))
+        XCTAssertEqual(run.results, ["clicked"])
+        // The row's text is "New chat" plus its shortcut hint; the label span decides.
+        XCTAssertEqual(run.page["clicked"] as? [String], ["new-chat"])
+        XCTAssertEqual(run.page["previousPath"] as? String, "/c/fixture")
+    }
+
+    @MainActor
+    func testFreshSessionLeavesTheStartPageAlone() async throws {
+        let run = try await runPageScripts(
+            [WebViewStore.freshSessionScript],
+            html: Self.freshSessionFixture,
+            url: "https://grok.com/",
+            probe: "{ clicked: window.clicked }"
+        )
+        XCTAssertEqual(run.results, ["already-fresh"])
+        XCTAssertEqual(run.page["clicked"] as? [String], [])
+    }
+
+    @MainActor
+    func testFreshSessionNeverUsesAProjectNewChatButton() async throws {
+        let run = try await runPageScripts(
+            [
+                "document.getElementById('new-chat').remove(); 'removed'",
+                WebViewStore.freshSessionScript,
+                "document.getElementById('chats-new-chat').remove(); 'removed'",
+                WebViewStore.freshSessionScript
+            ],
+            html: Self.freshSessionFixture,
+            url: "https://grok.com/c/fixture",
+            probe: "{ clicked: window.clicked }"
+        )
+        // Without the row, the Chats header's New chat button still counts.
+        // "New chat in Untitled project" never does.
+        XCTAssertEqual(run.results, ["removed", "clicked", "removed", "missing"])
+        XCTAssertEqual(run.page["clicked"] as? [String], ["chats-new-chat"])
+    }
+
+    @MainActor
+    func testFreshSessionDoesNothingOffGrok() async throws {
+        let run = try await runPageScripts(
+            [WebViewStore.freshSessionScript],
+            html: Self.freshSessionFixture,
+            url: "https://accounts.x.ai/c/fixture",
+            probe: "{ clicked: window.clicked }"
+        )
+        XCTAssertEqual(run.results, ["missing"])
+        XCTAssertEqual(run.page["clicked"] as? [String], [])
+    }
+
+    @MainActor
+    func testImaginePathLandsOnTheStartPage() {
+        XCTAssertEqual(WebViewStore.landingPath("/imagine"), "")
+        XCTAssertEqual(WebViewStore.landingPath("/imagine/"), "")
+        XCTAssertEqual(WebViewStore.landingPath("imagine"), "")
+        XCTAssertEqual(WebViewStore.landingPath("/"), "")
+        XCTAssertEqual(WebViewStore.landingPath("/c/abc"), "c/abc")
+        XCTAssertEqual(WebViewStore.landingPath("/imagine/saved"), "imagine/saved")
+    }
+
+    /// grok.com's Search button sits in the leading chrome the titlebar hides.
+    /// The right pane has a Search of its own, earlier in the document.
+    private static func searchFixture(dialogs: String = "") -> String {
+        """
+        <!DOCTYPE html>
+        <html>
+        <body style="margin:0">
+          <div id="grok-app-root">
+            <div><aside id="app-sidebar" aria-label="App navigation"></aside></div>
+            <section>
+              <div id="grok-content-area" role="main"></div>
+              <aside id="right-pane" aria-label="Right pane">
+                <button id="pane-search" aria-label="Search" style="width:28px;height:28px"></button>
+              </aside>
+            </section>
+            <span data-leading-chrome style="display:none">
+              <button aria-label="Toggle sidebar" aria-controls="app-sidebar" aria-expanded="true"></button>
+              <button id="search" aria-label="Search"></button>
+            </span>
+          </div>
+          <div id="consent" role="dialog" aria-label="Privacy Preference Center" inert hidden>
+            <input role="searchbox">
+          </div>
+          \(dialogs)
+          <script>
+            window.searchClicks = 0; window.paneClicks = 0; window.escapes = 0;
+            document.getElementById('pane-search').addEventListener('click', function () { window.paneClicks++; });
+            document.getElementById('search').addEventListener('click', function () {
+              window.searchClicks++;
+              var menu = document.createElement('div');
+              menu.id = 'command-menu';
+              menu.setAttribute('role', 'dialog');
+              menu.setAttribute('data-analytics-name', 'command_menu');
+              menu.setAttribute('data-open', '');
+              menu.style.cssText = 'position:fixed;top:18vh;left:40px;width:720px;height:300px';
+              menu.innerHTML = '<input role="combobox" aria-label="Search"><div role="listbox"></div>';
+              document.body.appendChild(menu);
+            });
+            document.addEventListener('keydown', function (event) {
+              if (event.key !== 'Escape') return;
+              window.escapes++;
+              var menu = document.getElementById('command-menu');
+              if (menu) menu.remove();
+            });
+          </script>
+        </body>
+        </html>
+        """
+    }
+
+    private static let searchProbe = """
+    { searchClicks: window.searchClicks, paneClicks: window.paneClicks, escapes: window.escapes,
+      menuOpen: !!document.getElementById('command-menu'), settingsOpen: !!document.getElementById('settings') }
+    """
+
+    @MainActor
+    func testSearchScriptsOpenAndCloseTheCommandMenu() async throws {
+        let run = try await runPageScripts(
+            [
+                WebViewStore.openSearchScript, WebViewStore.openSearchScript,
+                WebViewStore.toggleSearchScript, WebViewStore.toggleSearchScript
+            ],
+            html: Self.searchFixture(),
+            url: "https://grok.com/",
+            probe: Self.searchProbe
+        )
+        XCTAssertEqual(run.results, ["opened", "already-open", "closed", "opened"])
+        XCTAssertEqual(run.page["searchClicks"] as? Int, 2)
+        XCTAssertEqual(run.page["paneClicks"] as? Int, 0)
+        XCTAssertEqual(run.page["escapes"] as? Int, 1)
+        XCTAssertEqual(run.page["menuOpen"] as? Bool, true)
+    }
+
+    @MainActor
+    func testSettingsSearchFieldIsNotTheCommandMenu() async throws {
+        let settings = """
+        <div id="settings" role="dialog" data-open style="position:fixed;top:56px;left:40px;width:700px;height:400px">
+          <h2>Settings</h2>
+          <input type="search" aria-label="Search settings">
+          <button>Account</button><button>Appearance</button>
+        </div>
+        """
+        let run = try await runPageScripts(
+            [WebViewStore.toggleSearchScript, WebViewStore.openSearchScript, WebViewStore.toggleSearchScript],
+            html: Self.searchFixture(dialogs: settings),
+            url: "https://grok.com/",
+            probe: Self.searchProbe
+        )
+        // Settings up, Search closed: the toggle opens Search. It does not
+        // read Settings as an open Search and press Escape on it.
+        XCTAssertEqual(run.results, ["opened", "already-open", "closed"])
+        XCTAssertEqual(run.page["searchClicks"] as? Int, 1)
+        XCTAssertEqual(run.page["escapes"] as? Int, 1)
+        XCTAssertEqual(run.page["menuOpen"] as? Bool, false)
+        XCTAssertEqual(run.page["settingsOpen"] as? Bool, true)
+    }
+
+    @MainActor
+    func testADialogBuiltAroundAComboboxCountsAsOpenSearch() async throws {
+        let unnamed = """
+        <div id="palette" role="dialog" data-open style="position:fixed;top:18vh;left:40px;width:720px;height:300px">
+          <input role="combobox" aria-label="Search">
+        </div>
+        """
+        let open = try await runPageScripts(
+            [WebViewStore.openSearchScript],
+            html: Self.searchFixture(dialogs: unnamed),
+            url: "https://grok.com/",
+            probe: Self.searchProbe
+        )
+        XCTAssertEqual(open.results, ["already-open"])
+        XCTAssertEqual(open.page["searchClicks"] as? Int, 0)
+
+        let bare = try await runPageScripts(
+            [WebViewStore.openSearchScript, WebViewStore.toggleSearchScript],
+            html: "<!DOCTYPE html><html><body><div id=\"grok-content-area\" role=\"main\"></div></body></html>",
+            url: "https://grok.com/"
+        )
+        XCTAssertEqual(bare.results, ["missing", "missing"])
+    }
+
+    @MainActor
+    func testPluginsOpensSettingsFromConnectApps() async throws {
+        let html = GrokShellFixture.page(outside: """
+        <script>
+          window.connectClicks = 0;
+          document.getElementById('connect').addEventListener('click', function () {
+            window.connectClicks++;
+            var settings = document.createElement('div');
+            settings.setAttribute('role', 'dialog');
+            settings.setAttribute('data-open', '');
+            settings.style.cssText = 'position:fixed;top:56px;left:40px;width:700px;height:400px';
+            settings.innerHTML = '<h2>Settings</h2><button>Connect Apps</button><button>Skills</button>';
+            document.body.appendChild(settings);
+          });
+        </script>
+        """)
+        let run = try await runPageScripts(
+            [WebViewStore.openPluginsScript, WebViewStore.openPluginsScript],
+            html: html,
+            url: "https://grok.com/",
+            probe: "{ connectClicks: window.connectClicks }"
+        )
+        XCTAssertEqual(run.results, ["opened", "already-open"])
+        XCTAssertEqual(run.page["connectClicks"] as? Int, 1)
+
+        let missing = try await runPageScripts(
+            ["document.getElementById('connect').remove(); 'removed'", WebViewStore.openPluginsScript],
+            html: html,
+            url: "https://grok.com/",
+            probe: "{ connectClicks: window.connectClicks }"
+        )
+        XCTAssertEqual(missing.results, ["removed", "missing"])
+        XCTAssertEqual(missing.page["connectClicks"] as? Int, 0)
+    }
+
+    @MainActor
+    func testPrivateTogglesTheHeaderButtonInBothDirections() async throws {
+        // A chat that happens to be called Private sits in the sidebar, ahead
+        // of the real control in the document.
+        let html = GrokShellFixture.page(outside: """
+        <script>
+          window.privateLabels = []; window.sidebarClicks = 0;
+          var row = document.querySelector('#other-chat-row [data-sidebar-item-label]');
+          row.textContent = 'Private';
+          document.getElementById('other-chat-row').addEventListener('click', function () { window.sidebarClicks++; });
+          var toggle = document.getElementById('private');
+          toggle.addEventListener('click', function () {
+            window.privateLabels.push(toggle.getAttribute('aria-label'));
+            var entering = toggle.getAttribute('aria-pressed') !== 'true';
+            toggle.setAttribute('aria-pressed', String(entering));
+            toggle.setAttribute('aria-label', entering ? 'Exit Private Chat' : 'Switch to Private Chat');
+            // Only the label says what the control is once it is pressed.
+            toggle.textContent = entering ? '' : 'Private';
+          });
+        </script>
+        """)
+        let run = try await runPageScripts(
+            [WebViewStore.privateChatScript, WebViewStore.privateChatScript],
+            html: html,
+            url: "https://grok.com/",
+            probe: "{ labels: window.privateLabels, sidebarClicks: window.sidebarClicks }"
+        )
+        XCTAssertEqual(run.results, ["clicked", "clicked"])
+        XCTAssertEqual(run.page["labels"] as? [String], ["Switch to Private Chat", "Exit Private Chat"])
+        XCTAssertEqual(run.page["sidebarClicks"] as? Int, 0)
+
+        let missing = try await runPageScripts(
+            ["document.getElementById('private').remove(); 'removed'", WebViewStore.privateChatScript],
+            html: html,
+            url: "https://grok.com/",
+            probe: "{ sidebarClicks: window.sidebarClicks }"
+        )
+        XCTAssertEqual(missing.results, ["removed", "missing"])
+        XCTAssertEqual(missing.page["sidebarClicks"] as? Int, 0)
+    }
+
+    @MainActor
+    func testPageBackdropMatchesGrokPageFill() throws {
+        func backdrop(_ name: NSAppearance.Name) throws -> [Int] {
+            var resolved: NSColor?
+            try XCTUnwrap(NSAppearance(named: name)).performAsCurrentDrawingAppearance {
+                resolved = AppearancePreference.pageBackdrop.usingColorSpace(.sRGB)
+            }
+            let color = try XCTUnwrap(resolved)
+            return [color.redComponent, color.greenComponent, color.blueComponent, color.alphaComponent]
+                .map { Int(($0 * 255).rounded()) }
+        }
+        // grok.com's --grok-chrome: #F9F8F7 light, #1E1D1D dark.
+        XCTAssertEqual(try backdrop(.aqua), [0xF9, 0xF8, 0xF7, 255])
+        XCTAssertEqual(try backdrop(.darkAqua), [0x1E, 0x1D, 0x1D, 255])
     }
 
     func testAppearancePreferenceTitles() {
@@ -494,202 +749,113 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(outcome, "scrolled")
     }
 
+    /// grok.com swaps Voice mode, Send, and Stop through one composer slot.
     @MainActor
-    func testChromeScriptWiresPageHook() {
-        XCTAssertTrue(WebViewStore.chromeScript.contains("window.__grockChrome"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-hide"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("'Plugins'"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("{ key: 'hideImagine', text: 'Imagine', href: '/imagine', group: false }"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("{ key: 'hideLibrary', text: 'Library', href: '/library', group: false }"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("{ key: 'hidePlugins', text: 'Plugins', href: '', group: false }"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("{ key: 'hideProjects', text: 'Projects', href: '/project', group: true }"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("Skills and Connectors"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("hideSkills"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("Enter voice mode"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("div.h-10.w-10"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markComposerControl"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("sidebarShowsFullLabels"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("collapseIfExpanded"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("expandIfCollapsed"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("sidebarHidden: true"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("hidePrivate: true"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("hideGrokBot: true"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markHeaderControl"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-sidebar-hidden"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markSidebarShell"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("sidebarChromeCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[data-sidebar=\"header\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[data-sidebar=\"rail\"],[data-sidebar=\"resize-handle\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[data-slot=\"sidebar-rail\"],[data-slot=\"sidebar-resize-handle\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-rail"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("muteCollapseRails"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("blockRailEvent"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("stopImmediatePropagation"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("pointer-events:none"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("-end-[5px]"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("w-[10px]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("keepSidebarExpanded"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("sidebarIsIconCollapsed"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("var wasHidden = root.hasAttribute('data-grock-sidebar-hidden')"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function expandIfCollapsed() {"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("keepSidebarExpanded();"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("attributeFilter: ['data-state', 'disabled', 'aria-disabled', 'aria-busy', 'aria-pressed', 'aria-hidden']"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("titlebarInsetCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("grok-content-area"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("div[data-sidebar=\"sidebar\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("padding-top:var(--grock-titlebar)"))
+    func testReplyObserverPostsLandedWhenStopLeavesTheComposer() async throws {
+        let html = """
+        <!DOCTYPE html>
+        <html>
+        <body>
+          <div id="grok-content-area" role="main">
+            <form data-composer>
+              <div contenteditable="true" role="textbox" aria-label="Message Grok" style="width:300px;height:24px"></div>
+              <button id="action" type="button" aria-label="Voice mode" data-composer-action="voice"
+                      style="width:32px;height:32px"></button>
+            </form>
+          </div>
+        </body>
+        </html>
+        """
+        let recorder = ReplyFixtureRecorder()
+        let landed = expectation(description: "reply-landed")
+        recorder.onMessage = { body in
+            if body["kind"] as? String == "landed" { landed.fulfill() }
+        }
+        let (webView, window) = try await loadReplyObserver(html: html, recorder: recorder)
+        _ = window
+        let seen = try await callSessionJavaScript(webView, """
+          var action = document.getElementById('action');
+          var seen = [window.__grockReply.state().generating];
+          action.setAttribute('aria-label', 'Stop');
+          await new Promise(resolve => setTimeout(resolve, 50));
+          seen.push(window.__grockReply.state().generating);
+          action.setAttribute('aria-label', 'Voice mode');
+          await new Promise(resolve => setTimeout(resolve, 50));
+          seen.push(window.__grockReply.state().generating);
+          return seen;
+        """) as? [Bool]
+        XCTAssertEqual(seen, [false, true, false])
+        await fulfillment(of: [landed], timeout: 4)
+        XCTAssertEqual(recorder.kinds, ["state:true", "state:false", "landed"])
+    }
+
+    /// The Copy button under an answer lives in a footer below it. Scrolling
+    /// to that would show the end of the answer, not its start.
+    @MainActor
+    func testReplyObserverScrollsToTheStartOfTheLastAnswer() async throws {
+        let html = """
+        <!DOCTYPE html>
+        <html>
+        <body style="margin:0;overflow:hidden">
+          <div id="grok-content-area" role="main" style="height:300px;overflow:hidden">
+            <div id="transcript" role="log" data-testid="chat-transcript-scroller"
+                 style="height:300px;overflow-y:scroll">
+              <div data-testid="user-message"><span data-bubble-text>First question</span></div>
+              <div data-testid="assistant-message" style="height:500px">First answer</div>
+              <div data-testid="response-footer-actions">
+                <button aria-label="Copy response" style="width:20px;height:20px"></button>
+              </div>
+              <div data-testid="user-message"><span data-bubble-text>Second question</span></div>
+              <div id="last-answer" data-testid="assistant-message" style="height:900px">Second answer</div>
+              <div id="last-footer" data-testid="response-footer-actions">
+                <button aria-label="Copy response" style="width:20px;height:20px"></button>
+              </div>
+            </div>
+            <form data-composer>
+              <button aria-label="Voice mode" style="width:32px;height:32px"></button>
+            </form>
+          </div>
+        </body>
+        </html>
+        """
+        let (webView, window) = try await loadReplyObserver(html: html)
+        _ = window
+        let result = try await callSessionJavaScript(webView, """
+          var outcome = window.__grockReply.scrollToAnswer();
+          var transcript = document.getElementById('transcript').getBoundingClientRect();
+          var answer = document.getElementById('last-answer').getBoundingClientRect();
+          return { outcome: outcome, offset: answer.top - transcript.top };
+        """) as? [String: Any]
+        XCTAssertEqual(result?["outcome"] as? String, "scrolled")
+        // The answer starts just below the 52pt titlebar.
+        XCTAssertEqual(try XCTUnwrap(result?["offset"] as? Double), 52, accuracy: 1)
+    }
+
+    @MainActor
+    func testChromeScriptWiresPageHook() async throws {
+        // Everything native calls on the page: applyChrome, probeSessionActions,
+        // clickSessionAction, inspectSessionMenu.
+        let surface = try await evaluateChromeFixture(
+            html: "<!DOCTYPE html><html><body><div id=\"grok-content-area\" role=\"main\"></div></body></html>",
+            url: "https://grok.com/",
+            script: """
+            (function () {
+              var api = window.__grockChrome || {};
+              return {
+                set: typeof api.set, session: typeof api.session,
+                clickSession: typeof api.clickSession, inspectSessionMenu: typeof api.inspectSessionMenu
+              };
+            })()
+            """
+        )
+        for name in ["set", "session", "clickSession", "inspectSessionMenu"] {
+            XCTAssertEqual(surface[name] as? String, "function", name)
+        }
+        // The page script and the panel agree on the titlebar's height.
+        XCTAssertEqual(PanelGeometry.fallbackTitlebarInset, 52)
         XCTAssertTrue(WebViewStore.chromeScript.contains("--grock-titlebar:52px"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("findContentInsetTarget"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("isViewportShell"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("isPromptLike"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function isRealScroller"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function bestScrollingDescendant"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function scrollerFillsContentTop"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function restoreScrollerOverflow"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-scroll-restore"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("pinnedSidebarHidden"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("insetTargetIsStable"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("pinnedInsetTarget"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("isComposerTree"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("TITLEBAR_SPACER_PX"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("if (full && !config.sidebarHidden) keepSidebarExpanded"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("if (insetChanged) chaseContentInset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("applyContentInset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function isImaginePage"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function isImaginePath"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function isImagineAgentPath"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function isLibraryPath"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function isAutomationsPath"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function usesShellInset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("clearImagineOverlayChrome"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("if (isImaginePage())"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("if (usesShellInset())"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("return isImagineAgentPath();"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("grockImagineOverlaySpecialCase"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("p.indexOf('/imagine/') === 0"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("p === '/imagine/agent' || p.indexOf('/imagine/agent/') === 0"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("p === '/library' || p.indexOf('/library/') === 0"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("p === '/automations' || p.indexOf('/automations/') === 0"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-imagine-path"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("imagineStickyCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[data-composer-hero].sticky"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains(".sticky.top-0.z-30.h-16"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("calc(76px + var(--grock-titlebar))"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("position:sticky;top:0;z-index:50"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("html[data-grock-imagine-path]:not([data-grock-imagine]) #grok-content-area"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("html[data-grock-imagine-path] #grock-titlebar-fade{display:none"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("imagineShellInsetCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("libraryFillCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("html[data-grock-shell-inset]:not([data-grock-imagine]) #grok-content-area"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("html[data-grock-shell-inset]:not([data-grock-imagine]) #grok-content-area [class*=\"from-surface-base\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("html[data-grock-imagine] #grok-content-area[data-grock-imagine-inset=\"pad\"],"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("applyImagineShellInset"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("html:not([data-grock-imagine]) [role=\"dialog\"]:has("))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("html:not([data-grock-imagine]) [data-grock-plugins-dialog]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("50% + (var(--grock-titlebar) / 2)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("100dvh - var(--grock-titlebar) - 32px"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("pluginsDialogInsetCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-plugins-dialog"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-plugins-overlay"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markPluginsDialog"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("group-label"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markProjectSection"))
         XCTAssertTrue(WebViewStore.focusInputScript.contains("[contenteditable]"))
         XCTAssertTrue(WebViewStore.focusInputScript.contains("attempt(tries"))
-        XCTAssertTrue(WebViewStore.openPluginsScript.contains("Plugins"))
-        XCTAssertTrue(WebViewStore.openPluginsScript.contains("already-open"))
-        XCTAssertTrue(WebViewStore.openPluginsScript.contains("New Connector"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-imagine"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-shell-inset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-imagine-inset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("#grok-content-area[data-grock-imagine-inset=\"shift\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("#grok-content-area[data-grock-imagine-inset=\"pad\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("calc(100dvh - var(--grock-titlebar))!important"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-imagine-vh"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function markImagineViewportHeights"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function restoreImagineShellInline"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains(".h-dvh,"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("top:var(--grock-titlebar)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-content-inset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-home-inset"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("isCenteredHomeColumn"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("applyInsetMark"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("contentInsetCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("]::before"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("flex:0 0 var(--grock-titlebar)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("composerBackdropCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("chat-input-backdrop"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("background-color:transparent!important"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("removeAttribute('data-grock-pad-base')"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("CONTENT_PAD_BASE"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("setAttribute('data-grock-pad-base'"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("calc("))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("main#grok-content-area,div[data-sidebar"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("titlebarFadeCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("grock-titlebar-fade"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("ensureTitlebarFade"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("linear-gradient"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("position:absolute"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("position === 'static'"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("left:16rem"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("position:fixed;top:0"))
-        XCTAssertEqual(Int(PanelGeometry.titlebarFadeExtra), 28)
-        XCTAssertTrue(WebViewStore.chromeScript.contains("+ 28px"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markPageTopBar"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function findLoggedOutSignIn"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function markLoggedOutHeaderChrome"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function shouldHidePageTopBar"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("var hideBar = shouldHidePageTopBar(root)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("if (!full || !hideBar) return"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("pageHeaderCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("el.textContent !== css"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("paint(false)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("paintTimer"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains(", 200)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("addedNodes"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("from-surface-base"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains(".absolute.top-0.z-10.h-16"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains(".absolute.top-0.z-10.h-14"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains(".absolute.inset-x-0.top-0.z-10"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("artifactStickyCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("html:not([data-grock-imagine-path])"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("html[data-grock-page-header-hidden] #grok-content-area .sticky.top-0.z-10"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("html[data-grock-page-header-hidden] #grok-content-area .sticky.top-0.h-14"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("if (c.offsetHeight < 8) continue;"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("if (el.offsetHeight < 8) return false;"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("dumpLayout"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("set: apply"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("dumpLayout: dumpLayout"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("session: sessionSnapshot"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("clickSession: clickSession"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("inspectSessionMenu: inspectSessionMenu"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("z-index:100"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("z-index:40"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-page-header-hidden"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("document.getElementById('grok-app-root')"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("#grok-app-root>:not(#grok-content-area)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[style*=\"--sidebar-width\"]"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("--sidebar-width:0px"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("--sidebar-width:3rem"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("lockSidebar"))
-        XCTAssertTrue(WebViewStore.toggleSearchScript.contains("Search"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function markPromos"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function markGrokBotPromo"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("looksLikePromoToast"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("composerUpsellCard"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("forbiddenPromoText"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("isProtectedPromoHost"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("Never click Dismiss"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markPromos();"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("function promoHideCSS"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("mt-2.px-2.cursor-pointer:has(button)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("fixed.z-50:has(button[aria-label=\"Dismiss\"])"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("requestAnimationFrame(refreshChromeFrame)"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("[role=\"dialog\"], [role=\"alertdialog\"]"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("function dismissPromo"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("clickDismiss"))
-        XCTAssertTrue(WebViewStore.toggleSearchScript.contains("closed"))
-        XCTAssertTrue(WebViewStore.openSearchScript.contains("already-open"))
         XCTAssertEqual(TitleDestination.history.href, "/history")
         XCTAssertEqual(TitleDestination.library.href, "/library")
         XCTAssertEqual(TitleDestination.library.title, "Library")
@@ -697,70 +863,52 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(TitleDestination.plugins.title, "Plugins")
         XCTAssertNil(TitleDestination.projects.href)
         XCTAssertEqual(TitleDestination.imagine.href, "/imagine")
-        XCTAssertTrue(WebViewStore.openAllProjectsScript.contains("All projects"))
-        XCTAssertTrue(WebViewStore.openAllProjectsScript.contains("clicked"))
-        XCTAssertTrue(WebViewStore.openAllProjectsScript.contains("missing"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("['Chat', 'Imagine', 'Library', 'Automations']"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("['New Chat', 'History', 'Search']"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("historyProbeCSS"))
-        XCTAssertFalse(WebViewStore.chromeScript.contains("data-grock-history-probe"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("chaseContentInset"))
-        let clickImagine = WebViewStore.clickSidebarItemScript(label: "Imagine", href: "/imagine")
-        XCTAssertTrue(clickImagine.contains("Imagine"))
-        XCTAssertTrue(clickImagine.contains("/imagine"))
-        XCTAssertTrue(clickImagine.contains("clicked"))
-        XCTAssertTrue(clickImagine.contains("navigated"))
-        let clickHistory = WebViewStore.clickSidebarItemScript(label: "History", href: nil)
-        XCTAssertTrue(clickHistory.contains("History"))
-        XCTAssertTrue(clickHistory.contains("href = null"))
-        XCTAssertTrue(WebViewStore.privateChatScript.contains("Private"))
-        XCTAssertTrue(WebViewStore.privateChatScript.contains("already-private"))
-        XCTAssertTrue(WebViewStore.privateChatScript.contains("new-private"))
-        XCTAssertTrue(WebViewStore.privateChatScript.contains("Create New Chat"))
-        XCTAssertFalse(WebViewStore.privateChatScript.contains("label === 'Chat'"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("Imagine"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("Library"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("/library"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("/files"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("return 'Grok'"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("privacy preference"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("onetrust"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("conversationKey"))
-        XCTAssertTrue(WebViewStore.placeTitleScript.contains("/c/"))
-        XCTAssertFalse(WebViewStore.placeTitleScript.contains("h1, h2"))
-        XCTAssertFalse(WebViewStore.placeTitleScript.contains("querySelectorAll('h1"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("markSessionCluster"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-session-cluster"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-session-more"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-session-share"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-session-panel"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("data-grock-picking-menu"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("clickSession"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("inspectSessionMenu"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("session: sessionSnapshot"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("isConversationPath"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("delete chat"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("handlers.grockSession"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("authenticationStateFromDom"))
-        XCTAssertTrue(WebViewStore.chromeScript.contains("authenticated: authenticationStateFromDom()"))
         XCTAssertEqual(SessionActionsBridge.channelName, "grockSession")
     }
 
+    /// The name grok.com prints over the chat wins. Reply headings, the
+    /// sidebar, and the tab title are fallbacks.
     @MainActor
-    func testPlaceTitleUsesSidebarConversationNotReplyHeading() async throws {
+    func testPlaceTitleUsesConversationHeadingNotReplyHeading() async throws {
+        let html = """
+        <!DOCTYPE html>
+        <html>
+        <head><title>Stale tab title - Grok</title></head>
+        <body>
+          <aside id="app-sidebar" style="display:none">
+            <button aria-current="true"><span data-sidebar-item-label>Sidebar row title</span></button>
+          </aside>
+          <div id="grok-content-area" role="main">
+            <header data-header-over-column>
+              <div data-testid="conversation-title"><span data-sidebar-item-label>Example chat</span></div>
+            </header>
+            <h2>A heading inside the reply</h2>
+          </div>
+        </body>
+        </html>
+        """
+        let title = try await evaluatePlaceTitle(
+            html: html,
+            url: "https://grok.com/c/abc"
+        )
+        XCTAssertEqual(title, "Example chat")
+    }
+
+    @MainActor
+    func testPlaceTitleFallsBackToTheCurrentSidebarRow() async throws {
         let html = """
         <!DOCTYPE html>
         <html>
         <head><title>Grok</title></head>
         <body>
-          <div data-sidebar="sidebar" style="display:none">
-            <a href="/c/abc">Fastest Native macOS UI Prototyping</a>
-            <a href="/c/other">Chat on 8/27/2026</a>
+          <aside id="app-sidebar" style="display:none">
+            <button><span data-sidebar-item-label>Another chat</span></button>
+            <button aria-current="true"><span data-sidebar-item-label>Example chat</span><span>2h</span></button>
+            <button aria-label="Actions for Example chat" aria-haspopup="menu"></button>
+          </aside>
+          <div id="grok-content-area" role="main">
+            <h2>A heading inside the reply</h2>
           </div>
-          <main id="grok-content-area">
-            <h2>Fastest: Keynote (start today)</h2>
-            <h2>What I would actually do</h2>
-          </main>
         </body>
         </html>
         """
@@ -768,27 +916,68 @@ final class GrockTests: XCTestCase {
             html: html,
             url: "https://grok.com/c/abc"
         )
-        XCTAssertEqual(title, "Fastest Native macOS UI Prototyping")
+        XCTAssertEqual(title, "Example chat")
     }
 
     @MainActor
     func testPlaceTitleIgnoresReplyHeadingWhenDocumentTitleIsTheThread() async throws {
+        func page(title: String) -> String {
+            """
+            <!DOCTYPE html>
+            <html>
+            <head><title>\(title)</title></head>
+            <body>
+              <div id="grok-content-area" role="main">
+                <h2>A heading inside the reply</h2>
+              </div>
+            </body>
+            </html>
+            """
+        }
+        // Every grok.com page is titled "<name> - Grok".
+        for (documentTitle, expected) in [
+            ("Example chat - Grok", "Example chat"),
+            ("Example chat | Grok", "Example chat"),
+            ("Grok", ""),
+            ("Privacy Preference Center - Grok", "")
+        ] {
+            let title = try await evaluatePlaceTitle(
+                html: page(title: documentTitle),
+                url: "https://grok.com/c/abc"
+            )
+            XCTAssertEqual(title, expected, documentTitle)
+        }
+    }
+
+    @MainActor
+    func testPlaceTitleNamesPlacesFromThePath() async throws {
+        // A heading and a tab title are on the page; the path still decides.
         let html = """
         <!DOCTYPE html>
         <html>
-        <head><title>Fastest Native macOS UI Prototyping | Grok</title></head>
+        <head><title>Example chat - Grok</title></head>
         <body>
-          <main id="grok-content-area">
-            <h2>Fastest: Keynote (start today)</h2>
-          </main>
+          <div id="grok-content-area" role="main">
+            <header data-header-over-column>
+              <div data-testid="conversation-title"><span data-sidebar-item-label>Example chat</span></div>
+            </header>
+          </div>
         </body>
         </html>
         """
-        let title = try await evaluatePlaceTitle(
-            html: html,
-            url: "https://grok.com/c/abc"
-        )
-        XCTAssertEqual(title, "Fastest Native macOS UI Prototyping | Grok")
+        for (address, expected) in [
+            ("https://grok.com/", "Grok"),
+            ("https://grok.com/library", "Library"),
+            ("https://grok.com/files", "Library"),
+            ("https://grok.com/files/abc", "Library"),
+            ("https://grok.com/history", "History"),
+            ("https://grok.com/project", "Projects"),
+            ("https://grok.com/project/abc", "Example chat"),
+            ("https://accounts.x.ai/c/abc", "")
+        ] {
+            let title = try await evaluatePlaceTitle(html: html, url: address)
+            XCTAssertEqual(title, expected, address)
+        }
     }
 
     @MainActor
@@ -932,6 +1121,20 @@ final class GrockTests: XCTestCase {
             target: NSObject(),
             action: #selector(NSObject.description)
         )
+        // Signed out, only New Chat can be chosen: the rest are sign-in walls.
+        let signedOutMenu = NSMenu()
+        TitleDestination.rebuildMenu(
+            signedOutMenu,
+            pref: pref,
+            signedIn: false,
+            target: NSObject(),
+            action: #selector(NSObject.description)
+        )
+        let choosable = signedOutMenu.items.filter { !$0.isSeparatorItem && $0.isEnabled }.map(\.title)
+        XCTAssertEqual(choosable, ["New Chat"])
+        XCTAssertFalse(signedOutMenu.autoenablesItems)
+        XCTAssertTrue(menu.items.filter { !$0.isSeparatorItem }.allSatisfy(\.isEnabled))
+
         let shown = menu.items.filter { !$0.isSeparatorItem }.map(\.title)
         XCTAssertEqual(shown.first, "New Chat")
         XCTAssertEqual(shown, ["New Chat", "Automations", "Projects", "History"])
@@ -1179,14 +1382,22 @@ final class GrockTests: XCTestCase {
         panel.rebuildSessionMoreMenu()
         XCTAssertEqual(
             panel.sessionMoreMenu.items.filter { !$0.isSeparatorItem }.map(\.title),
-            ["Pin", "Toggle Right Panel", "Delete Chat"]
+            ["Pin", "Toggle Right Pane", "Archive"]
         )
         panel.sessionPinned = true
         panel.rebuildSessionMoreMenu()
         XCTAssertEqual(
             panel.sessionMoreMenu.items.filter { !$0.isSeparatorItem }.map(\.title),
-            ["Unpin", "Toggle Right Panel", "Delete Chat"]
+            ["Unpin", "Toggle Right Pane", "Archive"]
         )
+        // Offered only once grok.com's own menu has been seen to offer it.
+        panel.sessionProjectAvailable = true
+        panel.rebuildSessionMoreMenu()
+        XCTAssertEqual(
+            panel.sessionMoreMenu.items.filter { !$0.isSeparatorItem }.map(\.title),
+            ["Unpin", "Add to Project…", "Toggle Right Pane", "Archive"]
+        )
+        panel.sessionProjectAvailable = false
 
         WebViewStore.shared.applySessionActions(SessionActions(more: true, share: false, panel: true))
         panel.syncToolbar()
@@ -2500,416 +2711,479 @@ final class GrockTests: XCTestCase {
         XCTAssertTrue(WebViewStore.composerPresentScript.contains("textbox"))
     }
 
-    @MainActor
-    func testChromeScriptHidesPromoShapesAndSkipsAccountChrome() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body>
-          <div id="query-bar" class="query-bar">
-            <div contenteditable="true">Ask anything</div>
-          </div>
-          <div id="finance-promo">
-            <p>Finance</p>
-            <p>Connect accounts to manage your finances in chat</p>
-            <button type="button">Dismiss</button>
-            <button type="button">Add</button>
-          </div>
-          <div id="imagine-promo" style="position:fixed;left:24px;bottom:24px;width:360px;height:280px">
-            <button type="button" aria-label="Dismiss">X</button>
-            <video src="https://example.com/a.mp4"></video>
-            <span>Now with References</span>
-            <button type="button">Try References</button>
-          </div>
-          <div id="tos-dialog" role="dialog" style="position:fixed;left:200px;top:80px;width:400px;height:280px">
-            <button type="button" aria-label="Close">X</button>
-            <p>We've updated our Terms of Service</p>
-            <button type="button">I agree</button>
-          </div>
-          <div id="billing-toast" style="position:fixed;left:24px;bottom:24px;width:360px;height:220px">
-            <button type="button" aria-label="Dismiss">X</button>
-            <img src="https://example.com/a.png" width="360" height="80" alt="">
-            <p>Update your payment method</p>
-            <button type="button">Try SuperGrok</button>
-          </div>
-          <div id="x-connect">
-            <p>Connect your X account</p>
-            <button type="button">Dismiss</button>
-            <button type="button">Add</button>
-          </div>
-          <div id="grok-bot-promo" role="dialog" style="position:fixed;left:0;top:0;width:320px;height:340px">
-            <div aria-hidden="true" style="height:140px"></div>
-            <section>
-              <h2>Meet Grok Bot</h2>
-              <p>AI teammates you can give real work to. Bots can sign in to your tools, use them just like you do, and come back with finished work.</p>
-              <button type="button">Dismiss</button>
-            </section>
-          </div>
-          <div id="build-mode-promo" data-radix-popper-content-wrapper style="position:fixed;right:84px;bottom:0">
-            <div role="dialog" aria-label="Introducing Build Mode" data-state="open">
-              <div style="width:320px;height:300px;visibility:visible">
-                <video></video><p>Introducing Build Mode</p>
-                <p>Use Build Mode to create websites, games, apps, and interactive dashboards.</p>
-                <button onclick="window.promoClicked = true">Try now</button>
-                <button onclick="window.promoClicked = true">Dismiss</button>
-              </div>
-              <span data-radix-popper-arrow></span>
-            </div>
-          </div>
-          <div id="build-mode-dialog" data-radix-popper-content-wrapper>
-            <div role="dialog" aria-label="Introducing Build Mode" aria-modal="true">
-              <p>Build Mode settings</p><button>Close</button>
-            </div>
-          </div>
-          <div id="other-popover" data-radix-popper-content-wrapper>
-            <div role="dialog" aria-label="Account notice"><p>Sign in</p><button>Dismiss</button></div>
-          </div>
-          <div id="unify-card" role="region" aria-label="Unlock the ultimate AI subscription"
-               style="position:fixed;right:16px;bottom:16px;width:428px;height:80px">
-            <div><p>Unlock the ultimate AI subscription</p><p>Get benefits in Grok, Cursor and X</p></div>
-            <span aria-hidden="true">See plans</span>
-            <a href="https://accounts.x.ai/unify?redirect=grok-com&amp;src=grok_web_new_chat_card" aria-label="See plans"
-               style="position:absolute;inset:0"></a>
-            <span><button type="button" aria-label="Dismiss">x</button></span>
-          </div>
-          <div id="unify-elsewhere" role="region" aria-label="Plans">
-            <p>Manage your plan</p>
-            <a href="https://accounts.x.ai/unify?redirect=grok-com&amp;src=grok_web_settings_billing_banner">See plans</a>
-          </div>
-        </body>
-        </html>
-        """
-        let marks = try await evaluatePromoMarks(html: html)
-        XCTAssertEqual(marks["finance"], true)
-        XCTAssertEqual(marks["imagine"], true)
-        XCTAssertEqual(marks["tos"], false)
-        XCTAssertEqual(marks["billing"], false)
-        XCTAssertEqual(marks["xConnect"], false)
-        XCTAssertEqual(marks["grokBot"], true)
-        XCTAssertEqual(marks["buildMode"], true)
-        XCTAssertEqual(marks["buildModeDialog"], false)
-        XCTAssertEqual(marks["otherPopover"], false)
-        XCTAssertEqual(marks["unifyCard"], true)
-        XCTAssertEqual(marks["unifyElsewhere"], false)
-        XCTAssertEqual(marks["noPromoClick"], true)
-    }
+    // MARK: - Page chrome (DEC-071)
 
-    /// Search, and See all under Chats, open grok.com's command menu. It used
-    /// to be a centered dialog that grew under the titlebar; now it's anchored
-    /// at 18vh. Only the centered form may move.
+    private static let homeFixture = GrokShellFixture.page(content: GrokShellFixture.hero)
+
+    private static let conversationFixture = GrokShellFixture.page(
+        header: GrokShellFixture.conversationHeader,
+        content: GrokShellFixture.transcript + GrokShellFixture.composer,
+        title: "Example chat - Grok"
+    )
+
+    /// Read-only helpers for fixture scripts. `gone` is display:none on the
+    /// node or an ancestor; `blanked` keeps the box but cannot be seen or hit.
+    private static let domProbes = """
+    function node(id) { return document.getElementById(id); }
+    function gone(id) { var el = node(id); return !el || el.getClientRects().length === 0; }
+    function blanked(id) {
+      if (gone(id)) return false;
+      var style = getComputedStyle(node(id));
+      return style.visibility === 'hidden' && style.pointerEvents === 'none';
+    }
+    function seen(id) { return !gone(id) && getComputedStyle(node(id)).visibility !== 'hidden'; }
+    function sleep(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+    """
+
     @MainActor
-    func testCommandMenuInsetMovesOnlyTheCenteredDialog() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body style="margin:0">
-          <div id="anchored" role="dialog" class="fixed top-[18vh] translate-y-0"
-               style="position:fixed;left:50%;top:18vh;transform:translateX(-50%);width:600px;height:400px">
-            <div cmdk-root><input cmdk-input><div cmdk-list></div></div>
-          </div>
-          <div id="centered" role="dialog" class="fixed top-[50%] translate-y-[-50%]"
-               style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:600px;height:900px">
-            <div cmdk-root><input cmdk-input><div cmdk-list></div></div>
-          </div>
-        </body>
-        </html>
-        """
-        let result = try await evaluateChromeFixture(html: html, url: "https://grok.com/", script: """
-        (function () {
-          if (window.__grockChrome && window.__grockChrome.set) window.__grockChrome.set();
-          function edges(id) {
-            var r = document.getElementById(id).getBoundingClientRect();
-            return [r.top, r.bottom];
-          }
-          return { anchored: edges('anchored'), centered: edges('centered'), height: window.innerHeight };
-        })()
-        """)
-        func edges(_ key: String) -> [Double] {
-            (result[key] as? [NSNumber])?.map(\.doubleValue) ?? []
+    func testSidebarIsShownInFullOrGoneAndLeadingChromeStaysHidden() async throws {
+        let webView = try await loadSessionFixture(html: Self.homeFixture, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          return [true, false, true].map(function (hidden) {
+            window.__grockChrome.set({ sidebarHidden: hidden });
+            return {
+              sidebarGone: gone('app-sidebar'), boxGone: gone('sidebar-box'),
+              mainLeft: node('grok-content-area').getBoundingClientRect().left,
+              leadingGone: gone('leading'), searchGone: gone('search'),
+              resize: getComputedStyle(node('resize')).pointerEvents
+            };
+          });
+        """) as? [[String: Any]]
+        let states = try XCTUnwrap(result)
+        XCTAssertEqual(states.count, 3)
+        for (state, hidden) in zip(states, [true, false, true]) {
+            let context = "sidebarHidden=\(hidden)"
+            XCTAssertEqual(state["sidebarGone"] as? Bool, hidden, context)
+            // The wrapper goes too, so the main column takes the width.
+            XCTAssertEqual(state["boxGone"] as? Bool, hidden, context)
+            XCTAssertEqual(try XCTUnwrap(state["mainLeft"] as? Double), hidden ? 0 : 254, accuracy: 1, context)
+            // grok.com's own sidebar toggle and Search sit under the traffic lights.
+            XCTAssertEqual(state["leadingGone"] as? Bool, true, context)
+            XCTAssertEqual(state["searchGone"] as? Bool, true, context)
+            XCTAssertEqual(state["resize"] as? String, "none", context)
         }
-        let height = (result["height"] as? NSNumber)?.doubleValue ?? 0
-        XCTAssertEqual(height, 600, accuracy: 1)
-        // grok.com's own placement, untouched.
-        XCTAssertEqual(edges("anchored").first ?? -1, 0.18 * height, accuracy: 1)
-        XCTAssertEqual(edges("anchored").last ?? -1, 0.18 * height + 400, accuracy: 1)
-        // Shifted and capped: 16px below the 52px titlebar, 16px above the bottom.
-        XCTAssertGreaterThanOrEqual(edges("centered").first ?? -1, 52 + 16 - 1)
-        XCTAssertLessThanOrEqual(edges("centered").last ?? .infinity, height - 16 + 1)
     }
 
-    /// Session column, not New Chat home: collapsed in-page nav (height 0,
-    /// scrollHeight from the absolute h-14) must not win the titlebar spacer.
+    /// The media viewer's Copy, Save, and Close sit in the titlebar's corner,
+    /// and Close is the only way out. Other full-window dialogs stay put.
     @MainActor
-    func testContentInsetSkipsCollapsedNavAndLeavesComposerOnScreen() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body style="margin:0">
-          <main id="grok-content-area" style="height:600px;width:800px;overflow:hidden">
-            <div style="height:600px;width:800px;overflow:hidden;position:relative">
-              <div style="height:600px;width:800px;position:relative">
-                <div id="nav" style="height:0;width:800px;overflow:visible;position:relative">
-                  <div style="height:51px;width:800px">Grok Bot</div>
-                </div>
-                <div id="col" style="height:600px;width:800px;display:flex;flex-direction:column;position:relative">
-                  <div id="thread" style="height:600px;width:800px;overflow-y:auto">
-                    <div style="height:1800px;padding-top:80px">
-                      <p id="top-msg">hello thread</p>
-                      <div id="code-toolbar" class="sticky top-0" style="position:sticky;top:0;height:28px">Copy</div>
-                    </div>
-                  </div>
-                  <div id="composer" style="position:absolute;left:0;right:0;bottom:0;height:88px">
-                    <form><textarea>ask</textarea></form>
-                  </div>
-                </div>
-              </div>
+    func testMediaViewerStartsBelowTheTitlebar() async throws {
+        let html = GrokShellFixture.page(content: GrokShellFixture.hero, outside: """
+        <div id="viewer-box" role="presentation" style="position:fixed;inset:0">
+          <div role="dialog" aria-label="example.png" style="position:absolute;inset:0">
+            <div style="position:absolute;top:12px;right:12px">
+              <button aria-label="Copy image"></button>
+              <button aria-label="Save media"></button>
+              <button id="viewer-close" aria-label="Close lightbox" style="width:24px;height:24px"></button>
             </div>
-          </main>
-        </body>
-        </html>
-        """
-        let layout = try await evaluateContentInsetLayout(html: html)
-        XCTAssertEqual(layout["threadInset"] as? Bool, true)
-        XCTAssertEqual(layout["navInset"] as? Bool, false)
-        XCTAssertEqual(layout["colInset"] as? Bool, false)
-        XCTAssertEqual(layout["composerOnScreen"] as? Bool, true)
-        XCTAssertEqual(layout["toolbarRelative"] as? Bool, true)
-        XCTAssertEqual(layout["navHeight"] as? Int, 0)
-    }
-
-    @MainActor
-    func testSessionClusterIsHiddenOnConversationPages() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body style="margin:0">
-          <main id="grok-content-area" style="position:relative;height:600px;width:800px">
-            <div class="absolute inset-x-0 top-0 z-10 flex h-14" style="position:absolute;top:0;right:0;left:0;height:56px;display:flex;justify-content:flex-end">
-              <div id="cluster" class="flex flex-row items-center" style="display:flex;flex-direction:row;align-items:center;gap:6px">
-                <button type="button" aria-label="More" style="width:32px;height:32px"></button>
-                <button type="button" aria-label="Share" style="width:32px;height:32px"></button>
-                <button type="button" aria-label="Toggle panel" style="width:32px;height:32px"></button>
-              </div>
-            </div>
-          </main>
-        </body>
-        </html>
-        """
-        let marked = try await evaluateSessionCluster(html: html, url: "https://grok.com/c/fixture")
-        XCTAssertEqual(marked["cluster"], true)
-        XCTAssertEqual(marked["more"], true)
-        XCTAssertEqual(marked["share"], true)
-        XCTAssertEqual(marked["panel"], true)
-        XCTAssertEqual(marked["hidden"], true)
-        XCTAssertEqual(marked["sessionMore"], true)
-        XCTAssertEqual(marked["sessionShare"], true)
-        XCTAssertEqual(marked["sessionPanel"], true)
-    }
-
-    @MainActor
-    func testSessionActionsSurvivePanelOpenCloseAndHeaderRemount() async throws {
-        let html = """
-        <!DOCTYPE html><html><body style="margin:0">
-          <div id="grok-app-root" style="position:relative;height:600px;width:800px">
-            <div id="sidebar" data-collapsible="" data-side="left" data-state="expanded"></div>
-            <main id="grok-content-area" style="height:600px;width:500px">
-              <div id="decoy"><button aria-label="Expand"></button><button aria-label="Files"></button></div>
-              <div id="header" class="absolute inset-x-0 top-0 z-10 h-14">
-                <div id="cluster">
-                  <button id="more" aria-label="More" aria-haspopup="menu"></button>
-                  <button id="share" aria-label="Create share link"></button>
-                  <button id="toggle" aria-label="Toggle Right Panel" aria-pressed="false"></button>
-                </div>
-              </div>
-              <div id="response"><button aria-label="Create share link"></button><button aria-label="More actions"></button></div>
-            </main>
           </div>
-          <script>
-            var app = document.getElementById('grok-app-root');
-            var cluster = document.getElementById('cluster');
-            var toggle = document.getElementById('toggle');
-            var placeholder = document.createElement('div');
-            placeholder.className = 'h-8 shrink-0 overflow-hidden pointer-events-none';
-            var panel = document.createElement('div');
-            panel.id = 'panel';
-            panel.className = 'h-dvh overflow-hidden flex absolute inset-y-0';
-            panel.setAttribute('aria-hidden', 'false');
-            panel.style.cssText = 'position:absolute;top:0;right:0;height:600px;width:300px';
-            var controls = document.createElement('div');
-            controls.id = 'controls';
-            controls.style.cssText = 'position:absolute;top:15px;right:15px;height:32px';
-            controls.innerHTML = '<button aria-label="Expand"></button>';
-            toggle.addEventListener('click', function () {
-              var opening = toggle.getAttribute('aria-pressed') !== 'true';
-              toggle.setAttribute('aria-pressed', String(opening));
-              if (opening) {
-                toggle.replaceWith(placeholder);
-                controls.appendChild(toggle);
-                app.append(panel, controls);
-              } else {
-                placeholder.replaceWith(toggle);
-                panel.remove();
-                controls.remove();
-              }
-            });
-          </script>
-        </body></html>
-        """
-        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/c/fixture")
-        let opened = try await callSessionJavaScript(webView, """
-          var result = await window.__grockChrome.clickSession('panel');
-          // Flush DOM observers, not a frame: source hiding and panel geometry
-          // must already be correct before paint, including in occluded views.
-          await Promise.resolve();
-          var state = window.__grockChrome.session();
+        </div>
+        <div id="other-box" role="presentation" style="position:fixed;inset:0">
+          <div role="dialog" aria-label="Example"><button aria-label="Close">Close</button></div>
+        </div>
+        """)
+        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/library")
+        let result = try await callSessionJavaScript(webView, """
+          function top(id) { return document.getElementById(id).getBoundingClientRect().top; }
+          return { viewer: top('viewer-box'), close: top('viewer-close'), other: top('other-box') };
+        """) as? [String: Any]
+        let tops = try XCTUnwrap(result)
+        XCTAssertEqual(try XCTUnwrap(tops["viewer"] as? Double), 52, accuracy: 0.5)
+        XCTAssertEqual(try XCTUnwrap(tops["close"] as? Double), 64, accuracy: 0.5)
+        XCTAssertEqual(try XCTUnwrap(tops["other"] as? Double), 0, accuracy: 0.5)
+    }
+
+    /// grok.com's sidebar is open or collapsed to nothing. When the titlebar
+    /// says shown, the script opens it, and reopens it if grok.com closes it.
+    @MainActor
+    func testShownSidebarKeepsGrokSidebarExpanded() async throws {
+        let html = GrokShellFixture.page(content: GrokShellFixture.hero, outside: """
+        <script>
+          window.toggleClicks = 0; window.stuck = false;
+          var sidebarToggle = document.getElementById('sidebar-toggle');
+          sidebarToggle.setAttribute('aria-expanded', 'false');
+          sidebarToggle.addEventListener('click', function () {
+            window.toggleClicks++;
+            if (window.stuck) return;
+            var open = sidebarToggle.getAttribute('aria-expanded') === 'true';
+            sidebarToggle.setAttribute('aria-expanded', String(!open));
+          });
+        </script>
+        """)
+        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          var toggle = node('sidebar-toggle');
+          await sleep(300);
+          window.__grockChrome.set({ sidebarHidden: true });
+          var whileHidden = window.toggleClicks;
+          window.__grockChrome.set({ sidebarHidden: false });
+          var shown = window.toggleClicks, expanded = toggle.getAttribute('aria-expanded');
+          window.__grockChrome.set({ sidebarHidden: false });
+          var repeated = window.toggleClicks;
+          // grok.com closes it on its own (its shortcut).
+          await sleep(450);
+          toggle.setAttribute('aria-expanded', 'false');
+          await sleep(350);
+          var reopened = window.toggleClicks, expandedAgain = toggle.getAttribute('aria-expanded');
+          // A toggle that has not caught up yet must not be clicked twice.
+          await sleep(450);
+          window.stuck = true;
+          toggle.setAttribute('aria-expanded', 'false');
+          window.__grockChrome.set({ sidebarHidden: false });
+          window.__grockChrome.set({ sidebarHidden: false });
+          var slow = window.toggleClicks;
+          return { whileHidden: whileHidden, shown: shown, expanded: expanded, repeated: repeated,
+            reopened: reopened, expandedAgain: expandedAgain, slow: slow };
+        """) as? [String: Any]
+        XCTAssertEqual(result?["whileHidden"] as? Int, 0)
+        XCTAssertEqual(result?["shown"] as? Int, 1)
+        XCTAssertEqual(result?["expanded"] as? String, "true")
+        XCTAssertEqual(result?["repeated"] as? Int, 1)
+        XCTAssertEqual(result?["reopened"] as? Int, 2)
+        XCTAssertEqual(result?["expandedAgain"] as? String, "true")
+        XCTAssertEqual(result?["slow"] as? Int, 3)
+    }
+
+    @MainActor
+    func testAppearancePreferencesHideTheirGrokControls() async throws {
+        let targets = [
+            "hideGrokBot": "bots", "hideProjects": "projects", "hideLibrary": "library",
+            "hidePlugins": "connect", "hideDictation": "dictate", "hideVoice": "voice"
+        ]
+        let webView = try await loadSessionFixture(html: Self.homeFixture, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          var prefs = Object.keys(targets).sort();
+          var off = { sidebarHidden: false, hidePrivate: false };
+          prefs.forEach(function (pref) { off[pref] = false; });
+          window.__grockChrome.set(off);
+          var out = {};
+          prefs.forEach(function (pref) {
+            var allSeen = prefs.every(function (other) { return seen(targets[other]); });
+            var next = {};
+            next[pref] = true;
+            window.__grockChrome.set(next);
+            var hidden = prefs.filter(function (other) { return gone(targets[other]); })
+              .map(function (other) { return targets[other]; });
+            next[pref] = false;
+            window.__grockChrome.set(next);
+            out[pref] = { allSeen: allSeen, hidden: hidden, restored: seen(targets[pref]) };
+          });
+          return out;
+        """, arguments: ["targets": targets]) as? [String: [String: Any]]
+        let outcomes = try XCTUnwrap(result)
+        XCTAssertEqual(Set(outcomes.keys), Set(targets.keys))
+        for (pref, target) in targets {
+            XCTAssertEqual(outcomes[pref]?["allSeen"] as? Bool, true, pref)
+            XCTAssertEqual(outcomes[pref]?["hidden"] as? [String], [target], pref)
+            XCTAssertEqual(outcomes[pref]?["restored"] as? Bool, true, pref)
+        }
+    }
+
+    /// Send and Stop take Voice mode's place in the composer. Hiding Voice
+    /// must never hide them.
+    @MainActor
+    func testHidingVoiceKeepsSendInTheSameSlot() async throws {
+        let webView = try await loadSessionFixture(html: Self.homeFixture, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          window.__grockChrome.set({ hideVoice: true, hideDictation: true });
+          var voiceGone = gone('voice');
+          var slot = node('voice');
+          slot.setAttribute('aria-label', 'Send');
+          slot.setAttribute('data-composer-action', 'send');
+          var sendSeen = seen('voice');
+          slot.setAttribute('aria-label', 'Stop');
+          slot.setAttribute('data-composer-action', 'stop');
+          return { voiceGone: voiceGone, sendSeen: sendSeen, stopSeen: seen('voice'), attachSeen: seen('attach') };
+        """) as? [String: Bool]
+        XCTAssertEqual(result, ["voiceGone": true, "sendSeen": true, "stopSeen": true, "attachSeen": true])
+    }
+
+    /// Settings lists Bots, Data Controls, Billing, and Usage as tabs. The
+    /// sidebar preferences are about the sidebar and stop at its edge.
+    @MainActor
+    func testSidebarPreferencesLeaveDialogsAndNamesakesAlone() async throws {
+        let html = GrokShellFixture.page(content: GrokShellFixture.hero, outside: """
+        <div id="settings" role="dialog" data-open style="position:fixed;top:56px;left:40px;width:700px;height:400px">
+          <h2>Settings</h2>
+          <input type="search" aria-label="Search settings">
+          <button id="tab-library"><span data-sidebar-item-label>Library</span></button>
+          <button id="tab-connect" aria-label="Connect apps">Connect Apps</button>
+          <button id="tab-bots">Bots</button>
+          <button id="tab-data">Data Controls</button>
+          <button id="tab-billing">Billing</button>
+          <button id="tab-usage">Usage</button>
+        </div>
+        """)
+        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          // A project that happens to be called Library is not the Library row.
+          node('project-row').querySelector('[data-sidebar-item-label]').textContent = 'Library';
+          window.__grockChrome.set({ sidebarHidden: false, hideGrokBot: true, hideLibrary: true, hidePlugins: true });
+          var tabs = ['tab-library', 'tab-connect', 'tab-bots', 'tab-data', 'tab-billing', 'tab-usage'];
           return {
-            result: result, more: state.more, share: state.share, panel: state.panel,
-            hidden: getComputedStyle(cluster).display === 'none',
-            panelTop: panel.getBoundingClientRect().top,
-            panelBottom: panel.getBoundingClientRect().bottom,
-            controlsTop: controls.getBoundingClientRect().top,
-            toggleMarked: toggle.hasAttribute('data-grock-session-panel'),
-            sidebarHidden: getComputedStyle(document.getElementById('sidebar')).display === 'none',
-            decoyMarked: !!document.querySelector('#decoy [data-grock-session-more], #response [data-grock-session-share]')
+            botsGone: gone('bots'), libraryGone: gone('library'), connectGone: gone('connect'),
+            tabsSeen: tabs.filter(seen),
+            dialogMarks: node('settings').querySelectorAll('[data-grock-hide]').length,
+            namesakeSeen: seen('project-row')
           };
         """) as? [String: Any]
-        XCTAssertEqual(opened?["result"] as? String, "clicked")
-        for key in ["more", "share", "panel", "hidden", "toggleMarked", "sidebarHidden"] {
-            XCTAssertEqual(opened?[key] as? Bool, true, key)
-        }
-        XCTAssertEqual(opened?["panelTop"] as? Int, 52)
-        XCTAssertEqual(opened?["panelBottom"] as? Int, 600)
-        XCTAssertEqual(opened?["controlsTop"] as? Int, 67)
-        XCTAssertEqual(opened?["decoyMarked"] as? Bool, false)
+        XCTAssertEqual(result?["botsGone"] as? Bool, true)
+        XCTAssertEqual(result?["libraryGone"] as? Bool, true)
+        XCTAssertEqual(result?["connectGone"] as? Bool, true)
+        XCTAssertEqual(
+            result?["tabsSeen"] as? [String],
+            ["tab-library", "tab-connect", "tab-bots", "tab-data", "tab-billing", "tab-usage"]
+        )
+        XCTAssertEqual(result?["dialogMarks"] as? Int, 0)
+        XCTAssertEqual(result?["namesakeSeen"] as? Bool, true)
+    }
 
-        // Re-enter a conversation with the panel already open. No marker or
-        // DOM reference from the old header may be required for discovery.
-        let remounted = try await callSessionJavaScript(webView, """
-          var header = document.getElementById('header');
-          var replacement = header.cloneNode(true);
-          [replacement].concat(Array.from(replacement.querySelectorAll('*'))).forEach(function (el) {
-            Array.from(el.attributes).forEach(function (attr) {
-              if (attr.name.startsWith('data-grock-')) el.removeAttribute(attr.name);
+    /// Private is the only control in the New Chat band. Hidden, the band
+    /// keeps its box; shown, it drops below the titlebar. Neither moves the page.
+    @MainActor
+    func testPrivatePreferenceHidesOrShiftsTheHeaderWithoutMovingTheComposer() async throws {
+        let webView = try await loadSessionFixture(html: Self.homeFixture, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          var states = [];
+          for (var hidden of [true, false, true]) {
+            window.__grockChrome.set({ hidePrivate: hidden });
+            if (hidden && states.length) {
+              // grok.com remounts the band while it is hidden.
+              var header = node('page-header');
+              header.replaceWith(header.cloneNode(true));
+            }
+            node('composer').focus();
+            node('private').focus();
+            states.push({
+              flagged: document.documentElement.hasAttribute('data-grock-page-header-hidden'),
+              headerBlanked: blanked('page-header'), privateBlanked: blanked('private'),
+              privateFocused: document.activeElement.id === 'private',
+              headerTop: node('page-header').getBoundingClientRect().top,
+              headerHeight: node('page-header').offsetHeight,
+              heroTop: node('hero').getBoundingClientRect().top,
+              composerTop: node('composer').getBoundingClientRect().top
             });
-          });
-          header.replaceWith(replacement);
-          cluster = document.getElementById('cluster');
-          placeholder = cluster.lastElementChild;
-          await Promise.resolve();
-          var state = window.__grockChrome.session();
-          return { more: state.more, share: state.share, panel: state.panel,
-            hidden: getComputedStyle(cluster).display === 'none' };
-        """) as? [String: Bool]
-        for key in ["more", "share", "panel", "hidden"] {
-            XCTAssertEqual(remounted?[key], true, key)
+          }
+          return states;
+        """) as? [[String: Any]]
+        let states = try XCTUnwrap(result)
+        XCTAssertEqual(states.count, 3)
+        let baseline = try XCTUnwrap(states.first)
+        for (state, hidden) in zip(states, [true, false, true]) {
+            let context = "hidePrivate=\(hidden)"
+            XCTAssertEqual(state["flagged"] as? Bool, hidden, context)
+            XCTAssertEqual(state["headerBlanked"] as? Bool, hidden, context)
+            XCTAssertEqual(state["privateBlanked"] as? Bool, hidden, context)
+            XCTAssertEqual(state["privateFocused"] as? Bool, !hidden, context)
+            XCTAssertEqual(try XCTUnwrap(state["headerTop"] as? Double), hidden ? 0 : 52, accuracy: 0.5, context)
+            for key in ["headerHeight", "heroTop", "composerTop"] {
+                XCTAssertEqual(
+                    try XCTUnwrap(state[key] as? Double),
+                    try XCTUnwrap(baseline[key] as? Double),
+                    accuracy: 0.5, "\(key): \(context)"
+                )
+            }
         }
-        let closed = try await callSessionJavaScript(webView, """
-          var result = await window.__grockChrome.clickSession('panel');
-          await Promise.resolve();
-          return { result: result, removed: !panel.isConnected,
-            more: window.__grockChrome.session().more,
-            hidden: getComputedStyle(cluster).display === 'none' };
-        """) as? [String: Any]
-        XCTAssertEqual(closed?["result"] as? String, "clicked")
-        XCTAssertEqual(closed?["removed"] as? Bool, true)
-        XCTAssertEqual(closed?["more"] as? Bool, true)
-        XCTAssertEqual(closed?["hidden"] as? Bool, true)
     }
 
     @MainActor
-    func testSessionShareLoadingKeepsSourceHiddenAndNativeMoreAvailable() async throws {
-        let html = """
-        <!DOCTYPE html><html><body>
-          <main id="grok-content-area">
-            <div class="absolute inset-x-0 top-0 z-10 h-14">
-              <div id="cluster"><button aria-label="More"></button><button id="share" aria-label="Create share link"></button></div>
-            </div>
-          </main>
-        </body></html>
+    func testConversationTitleAndActionsBelongToTheTitlebar() async throws {
+        let webView = try await loadSessionFixture(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          function snapshot() {
+            return {
+              titleBlanked: blanked('title'), actionsBlanked: blanked('actions'),
+              titleWidth: node('title').getBoundingClientRect().width,
+              actionsWidth: node('actions').getBoundingClientRect().width,
+              headerBlanked: blanked('page-header'),
+              headerTop: node('page-header').getBoundingClientRect().top,
+              paneToggleBlanked: blanked('pane-toggle'),
+              leadingGone: gone('leading')
+            };
+          }
+          window.__grockChrome.set({ hidePrivate: false });
+          var shifted = snapshot();
+          window.__grockChrome.set({ hidePrivate: true });
+          return { shifted: shifted, hidden: snapshot() };
+        """) as? [String: [String: Any]]
+        for (name, headerHidden) in [("shifted", false), ("hidden", true)] {
+            let state = try XCTUnwrap(result?[name], name)
+            // Hidden, not removed: the menu the trigger opens still has an anchor.
+            XCTAssertEqual(state["titleBlanked"] as? Bool, true, name)
+            XCTAssertEqual(state["actionsBlanked"] as? Bool, true, name)
+            XCTAssertGreaterThan(try XCTUnwrap(state["titleWidth"] as? Double), 0, name)
+            XCTAssertGreaterThan(try XCTUnwrap(state["actionsWidth"] as? Double), 0, name)
+            XCTAssertEqual(state["headerBlanked"] as? Bool, headerHidden, name)
+            XCTAssertEqual(try XCTUnwrap(state["headerTop"] as? Double), headerHidden ? 0 : 52, accuracy: 0.5, name)
+            XCTAssertEqual(state["paneToggleBlanked"] as? Bool, true, name)
+            XCTAssertEqual(state["leadingGone"] as? Bool, true, name)
+        }
+    }
+
+    @MainActor
+    func testConversationPageOffersMoreShareAndPanel() async throws {
+        let state = try await evaluateSessionState(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        XCTAssertEqual(state, ["more": true, "share": true, "panel": true, "authenticated": true])
+    }
+
+    /// The same controls on any other path are not a conversation's.
+    @MainActor
+    func testSessionActionsStayOffOutsideConversations() async throws {
+        for address in ["https://grok.com/", "https://grok.com/project/fixture", "https://grok.com/library"] {
+            let state = try await evaluateSessionState(html: Self.conversationFixture, url: address)
+            XCTAssertEqual(state, ["more": false, "share": false, "panel": false, "authenticated": true], address)
+        }
+    }
+
+    /// The right pane's script, as far as the titlebar cares: closed, it is
+    /// inert with its Hide button inside and a floating toggle outside.
+    private static let rightPaneFixture = GrokShellFixture.page(
+        header: GrokShellFixture.conversationHeader,
+        content: GrokShellFixture.transcript + GrokShellFixture.composer,
+        outside: """
+        <script>
+          (function () {
+            var pane = document.getElementById('right-pane');
+            var box = document.getElementById('pane-yield');
+            var toggle = document.getElementById('pane-toggle');
+            window.paneClicks = [];
+            function setOpen(open) {
+              if (open) {
+                pane.removeAttribute('inert');
+                pane.setAttribute('aria-hidden', 'false');
+                pane.style.width = '300px';
+                toggle.remove();
+              } else {
+                pane.setAttribute('inert', '');
+                pane.setAttribute('aria-hidden', 'true');
+                pane.style.width = '0';
+                box.appendChild(toggle);
+              }
+            }
+            toggle.addEventListener('click', function () { window.paneClicks.push('toggle'); setOpen(true); });
+            document.getElementById('hide-pane').addEventListener('click', function () {
+              window.paneClicks.push('hide');
+              setOpen(false);
+            });
+          })();
+        </script>
         """
-        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/c/fixture")
-        let loading = try await callSessionJavaScript(webView, """
-          window.__grockChrome.set();
-          var share = document.getElementById('share');
-          var spinner = document.createElement('div');
-          spinner.setAttribute('role', 'status');
-          share.replaceWith(spinner);
-          await Promise.resolve();
-          var cluster = document.getElementById('cluster');
-          var hiddenBeforeSnapshot = getComputedStyle(cluster).display === 'none';
-          var state = window.__grockChrome.session();
-          return { more: state.more, share: state.share, hidden: hiddenBeforeSnapshot,
-            result: await window.__grockChrome.clickSession('share') };
-        """) as? [String: Any]
-        XCTAssertEqual(loading?["more"] as? Bool, true)
-        XCTAssertEqual(loading?["share"] as? Bool, false)
-        XCTAssertEqual(loading?["hidden"] as? Bool, true)
-        XCTAssertEqual(loading?["result"] as? String, "missing")
+    )
 
-        let finished = try await callSessionJavaScript(webView, """
-          var replacement = document.createElement('button');
-          replacement.setAttribute('aria-label', 'Create share link');
-          replacement.addEventListener('click', function () { document.body.dataset.shared = 'true'; });
-          document.querySelector('[role=status]').replaceWith(replacement);
-          await Promise.resolve();
-          replacement.disabled = true;
-          await Promise.resolve();
-          var disabled = window.__grockChrome.session().share;
-          var blocked = await window.__grockChrome.clickSession('share');
-          replacement.disabled = false;
-          await Promise.resolve();
-          var enabled = window.__grockChrome.session().share;
-          var result = await window.__grockChrome.clickSession('share');
-          return { disabled: disabled, blocked: blocked, enabled: enabled,
-            result: result, shared: document.body.dataset.shared,
-            hidden: getComputedStyle(document.getElementById('cluster')).display === 'none' };
+    @MainActor
+    func testPanelActionUsesWhicheverPaneToggleIsLive() async throws {
+        let webView = try await loadSessionFixture(html: Self.rightPaneFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          var chrome = window.__grockChrome;
+          var closed = chrome.session().panel;
+          var opened = await chrome.clickSession('panel');
+          var open = chrome.session().panel;
+          var paneOpen = !node('right-pane').hasAttribute('inert');
+          var paneTop = getComputedStyle(node('right-pane')).paddingTop;
+          var shut = await chrome.clickSession('panel');
+          var toggle = node('pane-toggle');
+          toggle.setAttribute('aria-disabled', 'true');
+          var disabled = await chrome.clickSession('panel');
+          toggle.removeAttribute('aria-disabled');
+          toggle.style.display = 'none';
+          var undrawn = chrome.session().panel;
+          // Only the closed pane's inert Hide button is left.
+          toggle.remove();
+          var inertOnly = chrome.session().panel;
+          var missing = await chrome.clickSession('panel');
+          return { closed: closed, opened: opened, open: open, paneOpen: paneOpen, paneTop: paneTop, shut: shut,
+            disabled: disabled, undrawn: undrawn, inertOnly: inertOnly, missing: missing, clicks: window.paneClicks };
         """) as? [String: Any]
-        XCTAssertEqual(finished?["disabled"] as? Bool, false)
-        XCTAssertEqual(finished?["blocked"] as? String, "unavailable")
-        XCTAssertEqual(finished?["enabled"] as? Bool, true)
-        XCTAssertEqual(finished?["result"] as? String, "clicked")
-        XCTAssertEqual(finished?["shared"] as? String, "true")
-        XCTAssertEqual(finished?["hidden"] as? Bool, true)
+        XCTAssertEqual(result?["closed"] as? Bool, true)
+        XCTAssertEqual(result?["opened"] as? String, "clicked")
+        XCTAssertEqual(result?["open"] as? Bool, true)
+        XCTAssertEqual(result?["paneOpen"] as? Bool, true)
+        // An open pane has a toolbar of its own, so it starts below the titlebar.
+        XCTAssertEqual(result?["paneTop"] as? String, "52px")
+        XCTAssertEqual(result?["shut"] as? String, "clicked")
+        XCTAssertEqual(result?["disabled"] as? String, "unavailable")
+        XCTAssertEqual(result?["undrawn"] as? Bool, false)
+        XCTAssertEqual(result?["inertOnly"] as? Bool, false)
+        XCTAssertEqual(result?["missing"] as? String, "missing")
+        XCTAssertEqual(result?["clicks"] as? [String], ["toggle", "hide"])
+    }
+
+    /// Share is an item in Conversation Actions now, so both follow that one
+    /// trigger: through a remount, without its test id, and while it is busy.
+    @MainActor
+    func testMoreAndShareFollowTheConversationActionsTrigger() async throws {
+        let webView = try await loadSessionFixture(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          var chrome = window.__grockChrome;
+          function flags() { var state = chrome.session(); return [state.more, state.share]; }
+          var out = { initial: flags() };
+          var header = node('page-header');
+          header.replaceWith(header.cloneNode(true));
+          out.remounted = flags();
+          out.remountBlanked = blanked('actions');
+          node('actions').removeAttribute('data-testid');
+          out.byLabel = flags();
+          node('actions').setAttribute('aria-busy', 'true');
+          out.busy = flags();
+          out.busyShare = await chrome.clickSession('share');
+          node('actions').removeAttribute('aria-busy');
+          node('actions').disabled = true;
+          out.disabled = flags();
+          node('actions').disabled = false;
+          out.ready = flags();
+          node('actions').remove();
+          out.removed = flags();
+          return out;
+        """) as? [String: Any]
+        XCTAssertEqual(result?["initial"] as? [Bool], [true, true])
+        XCTAssertEqual(result?["remounted"] as? [Bool], [true, true])
+        XCTAssertEqual(result?["remountBlanked"] as? Bool, true)
+        XCTAssertEqual(result?["byLabel"] as? [Bool], [true, true])
+        XCTAssertEqual(result?["busy"] as? [Bool], [false, false])
+        XCTAssertEqual(result?["busyShare"] as? String, "missing")
+        XCTAssertEqual(result?["disabled"] as? [Bool], [false, false])
+        XCTAssertEqual(result?["ready"] as? [Bool], [true, true])
+        XCTAssertEqual(result?["removed"] as? [Bool], [false, false])
     }
 
     @MainActor
-    func testUnchangedChromeRefreshDoesNotMoveStylesheetOrRewriteSessionMarks() async throws {
-        let webView = try await loadSessionFixture(html: Self.chromePerformanceFixture, url: "https://grok.com/c/fixture")
-        let result = try await callSessionJavaScript(webView, """
+    func testUnchangedChromeRefreshWritesNothingToThePage() async throws {
+        let webView = try await loadSessionFixture(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
           window.__grockChrome.set();
           var observer = new MutationObserver(function () {});
-          observer.observe(document.documentElement, {childList:true, subtree:true, attributes:true});
+          observer.observe(document.documentElement, {
+            childList: true, subtree: true, attributes: true, characterData: true
+          });
           for (var i = 0; i < 20; i++) window.__grockChrome.set();
           var records = observer.takeRecords();
           observer.disconnect();
           return {
-            styleMoves: records.filter(r => Array.from(r.removedNodes).some(n => n.id === 'grock-chrome-style')).length,
-            sessionWrites: records.filter(r => r.attributeName && /^data-grock-(session|right-panel|panel-controls)/.test(r.attributeName)).length,
-            railWrites: records.filter(r => r.attributeName === 'data-grock-rail').length,
+            writes: records.length,
             sheets: document.querySelectorAll('#grock-chrome-style').length,
-            hidden: getComputedStyle(document.getElementById('cluster')).display === 'none'
+            hidden: blanked('title')
           };
         """) as? [String: Any]
-        XCTAssertEqual(result?["styleMoves"] as? Int, 0)
-        XCTAssertEqual(result?["sessionWrites"] as? Int, 0)
-        XCTAssertEqual(result?["railWrites"] as? Int, 0)
+        XCTAssertEqual(result?["writes"] as? Int, 0)
         XCTAssertEqual(result?["sheets"] as? Int, 1)
         XCTAssertEqual(result?["hidden"] as? Bool, true)
     }
 
     @MainActor
     func testChromeStylesheetRecoversPrecedenceWithoutFollowingUnrelatedHeadNodes() async throws {
-        let webView = try await loadSessionFixture(html: Self.chromePerformanceFixture, url: "https://grok.com/c/fixture")
-        let result = try await callSessionJavaScript(webView, """
+        let webView = try await loadSessionFixture(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
           window.__grockChrome.set();
           var sheet = document.getElementById('grock-chrome-style');
           var observer = new MutationObserver(function () {});
           observer.observe(document.head, {childList:true});
           var later = document.createElement('style');
-          later.textContent = '[data-grock-session-cluster]{display:block!important}';
+          later.textContent = '[data-leading-chrome]{display:inline-block!important}';
           document.head.appendChild(later);
+          var overridden = !gone('leading');
           window.__grockChrome.set();
-          var recovered = getComputedStyle(document.getElementById('cluster')).display === 'none';
+          var recovered = gone('leading');
           var moved = observer.takeRecords().filter(r => Array.from(r.removedNodes).includes(sheet)).length;
           document.head.appendChild(document.createElement('meta'));
           window.__grockChrome.set();
@@ -2917,11 +3191,12 @@ final class GrockTests: XCTestCase {
           sheet.remove();
           window.__grockChrome.set();
           observer.disconnect();
-          return {recovered:recovered, moved:moved, unrelatedMoves:unrelatedMoves,
+          return {overridden:overridden, recovered:recovered, moved:moved, unrelatedMoves:unrelatedMoves,
             recreated:document.getElementById('grock-chrome-style') !== sheet,
             sheets:document.querySelectorAll('#grock-chrome-style').length,
-            hidden:getComputedStyle(document.getElementById('cluster')).display === 'none'};
+            hidden:gone('leading')};
         """) as? [String: Any]
+        XCTAssertEqual(result?["overridden"] as? Bool, true)
         XCTAssertEqual(result?["recovered"] as? Bool, true)
         XCTAssertEqual(result?["moved"] as? Int, 1)
         XCTAssertEqual(result?["unrelatedMoves"] as? Int, 0)
@@ -2930,349 +3205,362 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(result?["hidden"] as? Bool, true)
     }
 
+    /// Lets the load settle, then replaces rAF with a queue the test drains and
+    /// counts the document-wide button scan that only a repaint makes (the
+    /// promo pass).
+    private static let frameStubs = """
+    window.__grockChrome.set();
+    await sleep(350);
+    var raf = window.requestAnimationFrame, cancel = window.cancelAnimationFrame;
+    var query = Document.prototype.querySelectorAll;
+    var pending = new Map(), serial = 0, cancelled = 0, repaints = 0;
+    window.requestAnimationFrame = function (cb) { pending.set(++serial, cb); return serial; };
+    window.cancelAnimationFrame = function (id) { if (pending.delete(id)) cancelled++; };
+    Document.prototype.querySelectorAll = function (selector) {
+      if (selector === 'button, [role="button"]') repaints++;
+      return query.apply(this, arguments);
+    };
+    function restoreFrames() {
+      window.requestAnimationFrame = raf;
+      window.cancelAnimationFrame = cancel;
+      Document.prototype.querySelectorAll = query;
+      pending.clear();
+    }
+
+    """
+
     @MainActor
-    func testChromeMutationBurstBatchesFramesAndDefersUnrelatedScans() async throws {
-        let webView = try await loadSessionFixture(html: Self.chromePerformanceFixture, url: "https://grok.com/c/fixture")
-        let result = try await callSessionJavaScript(webView, """
-          window.__grockChrome.set();
-          await new Promise(resolve => setTimeout(resolve, 350));
-          var raf = window.requestAnimationFrame, cancel = window.cancelAnimationFrame;
-          var query = Document.prototype.querySelectorAll;
-          var pending = new Map(), serial = 0, sessionScans = 0, promoScans = 0, cancelled = 0;
-          window.requestAnimationFrame = function (cb) { pending.set(++serial, cb); return serial; };
-          window.cancelAnimationFrame = function (id) { if (pending.delete(id)) cancelled++; };
-          Document.prototype.querySelectorAll = function (selector) {
-            if (selector.indexOf('[data-grock-session-cluster]') === 0) sessionScans++;
-            if (selector === 'button, [role="button"]') promoScans++;
-            return query.apply(this, arguments);
-          };
+    func testChromeMutationBurstBatchesFramesAndRepaintsOnce() async throws {
+        let webView = try await loadSessionFixture(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + Self.frameStubs + """
           try {
-            var response = document.getElementById('response');
+            var column = node('main-column');
             for (var i = 0; i < 50; i++) {
-              response.appendChild(document.createElement('span'));
+              column.appendChild(document.createElement('span'));
               await Promise.resolve();
             }
             await Promise.resolve();
-            var queued = pending.size, immediateSession = sessionScans, immediatePromo = promoScans;
+            var queued = pending.size, immediate = repaints;
             var callbacks = Array.from(pending.values());
             pending.clear();
             callbacks.forEach(cb => cb(performance.now()));
-            var deferredPromo = promoScans;
-            response.appendChild(document.createElement('span'));
+            var afterFrame = repaints;
+            column.appendChild(document.createElement('span'));
             await Promise.resolve();
             var nextFrame = pending.size;
-            window.__grockChrome.set();
-            return {queued:queued, immediateSession:immediateSession, immediatePromo:immediatePromo,
-              deferredPromo:deferredPromo, nextFrame:nextFrame, cancelled:cancelled};
+            await sleep(350);
+            return {queued:queued, immediate:immediate, afterFrame:afterFrame, nextFrame:nextFrame,
+              afterTimer:repaints, cancelled:cancelled, left:pending.size};
           } finally {
-            window.requestAnimationFrame = raf;
-            window.cancelAnimationFrame = cancel;
-            Document.prototype.querySelectorAll = query;
-            pending.clear();
+            restoreFrames();
           }
         """) as? [String: Any]
         XCTAssertEqual(result?["queued"] as? Int, 1)
-        XCTAssertEqual(result?["immediateSession"] as? Int, 0)
-        XCTAssertEqual(result?["immediatePromo"] as? Int, 0)
-        XCTAssertGreaterThan(result?["deferredPromo"] as? Int ?? 0, 0)
+        XCTAssertEqual(result?["immediate"] as? Int, 0)
+        // A frame refreshes the header flag and the session state, nothing wider.
+        XCTAssertEqual(result?["afterFrame"] as? Int, 0)
         XCTAssertEqual(result?["nextFrame"] as? Int, 1)
-        XCTAssertGreaterThan(result?["cancelled"] as? Int ?? 0, 0)
+        // 51 mutations, one repaint, and it retires the frame it made redundant.
+        XCTAssertEqual(result?["afterTimer"] as? Int, 1)
+        XCTAssertEqual(result?["cancelled"] as? Int, 1)
+        XCTAssertEqual(result?["left"] as? Int, 0)
+    }
+
+    /// A streaming answer and a draft being typed add nodes many times a
+    /// second. Neither is chrome, so neither may wake the chrome script.
+    @MainActor
+    func testStreamingAnswerAndTypingDoNotScheduleChromeWork() async throws {
+        let webView = try await loadSessionFixture(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + Self.frameStubs + """
+          try {
+            for (var i = 0; i < 20; i++) {
+              node('answer').appendChild(document.createElement('p'));
+              node('composer').appendChild(document.createElement('br'));
+              await Promise.resolve();
+            }
+            await Promise.resolve();
+            var streaming = pending.size;
+            await sleep(350);
+            var streamingRepaints = repaints;
+            // The same observer still hears chrome: a busy Conversation Actions.
+            node('actions').setAttribute('aria-busy', 'true');
+            await Promise.resolve();
+            return {streaming:streaming, streamingRepaints:streamingRepaints, chrome:pending.size};
+          } finally {
+            restoreFrames();
+            window.__grockChrome.set();
+          }
+        """) as? [String: Int]
+        XCTAssertEqual(result, ["streaming": 0, "streamingRepaints": 0, "chrome": 1])
     }
 
     @MainActor
     func testChromeTimerDrainsDeferredWorkWhenAnimationFramesStop() async throws {
-        let webView = try await loadSessionFixture(html: Self.chromePerformanceFixture, url: "https://grok.com/c/fixture")
-        let result = try await callSessionJavaScript(webView, """
-          window.__grockChrome.set();
-          await new Promise(resolve => setTimeout(resolve, 350));
-          var raf = window.requestAnimationFrame, cancel = window.cancelAnimationFrame;
-          var pending = new Map(), serial = 0, cancelled = 0;
-          window.requestAnimationFrame = function (cb) { pending.set(++serial, cb); return serial; };
-          window.cancelAnimationFrame = function (id) { if (pending.delete(id)) cancelled++; };
+        let webView = try await loadSessionFixture(html: Self.conversationFixture, url: "https://grok.com/c/fixture")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + Self.frameStubs + """
           try {
-            var response = document.getElementById('response');
-            response.insertAdjacentHTML('beforeend', '<div id="late-promo"><p>Finance</p><p>Connect accounts to manage your finances in chat</p><button>Dismiss</button><button>Add</button></div>');
+            node('main-column').insertAdjacentHTML('beforeend', latePromo);
             await Promise.resolve();
             var queued = pending.size;
-            await new Promise(resolve => setTimeout(resolve, 350));
-            var hidden = getComputedStyle(document.getElementById('late-promo')).display === 'none';
+            await sleep(350);
+            var hidden = gone('late-promo');
             var drained = cancelled;
             var callbacks = serial;
-            await new Promise(resolve => setTimeout(resolve, 350));
+            await sleep(350);
             return {queued:queued, hidden:hidden, drained:drained, idle:serial === callbacks};
           } finally {
-            window.requestAnimationFrame = raf;
-            window.cancelAnimationFrame = cancel;
+            restoreFrames();
             window.__grockChrome.set();
           }
-        """) as? [String: Any]
+        """, arguments: ["latePromo": Self.promoCard("late-promo", title: "Unlock the full experience")]) as? [String: Any]
         XCTAssertEqual(result?["queued"] as? Int, 1)
         XCTAssertEqual(result?["hidden"] as? Bool, true)
         XCTAssertEqual(result?["drained"] as? Int, 1)
+        // Marking the card is our own write; it must not start another pass.
         XCTAssertEqual(result?["idle"] as? Bool, true)
     }
 
+    /// An occluded WebView stops getting frames. A busy trigger still has to
+    /// reach the titlebar, and a remounted header is hidden with no script at all.
     @MainActor
-    func testSessionRemountAndPanelStateRefreshBeforeAnyAnimationFrame() async throws {
+    func testHeaderRemountAndBusyTriggerNeedNoAnimationFrame() async throws {
         let bridge = SessionActionsBridge()
-        let disabledShare = expectation(description: "disabled-share-without-frame")
-        var watchShare = false
+        let busyReported = expectation(description: "busy-trigger-without-frame")
+        var watching = false
         bridge.handler = { _, body in
-            if watchShare, body["more"] as? Bool == true, body["share"] as? Bool == false {
-                watchShare = false
-                disabledShare.fulfill()
+            if watching, body["more"] as? Bool == false, body["share"] as? Bool == false {
+                watching = false
+                busyReported.fulfill()
             }
         }
         let webView = try await loadSessionFixture(
-            html: Self.chromePerformanceFixture, url: "https://grok.com/c/fixture", sessionBridge: bridge
+            html: Self.conversationFixture, url: "https://grok.com/c/fixture", sessionBridge: bridge
         )
-        watchShare = true
-        let result = try await callSessionJavaScript(webView, """
+        watching = true
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
           window.__grockChrome.set();
-          await new Promise(resolve => setTimeout(resolve, 350));
+          await sleep(350);
           var raf = window.requestAnimationFrame, cancel = window.cancelAnimationFrame;
-          var handler = window.webkit.messageHandlers.grockSession, post = handler.postMessage;
-          var posted = null;
-          handler.postMessage = function (body) { posted = body; post.call(handler, body); };
           window.requestAnimationFrame = function () { return 12345; };
           window.cancelAnimationFrame = function () {};
           try {
-            // The first mutation is unrelated; it must not conceal a later
-            // header replacement in the same observer delivery.
-            document.getElementById('response').appendChild(document.createElement('span'));
-            var old = document.getElementById('header'), replacement = old.cloneNode(true);
-            [replacement].concat(Array.from(replacement.querySelectorAll('*'))).forEach(el => {
-              Array.from(el.attributes).forEach(a => { if (a.name.startsWith('data-grock-')) el.removeAttribute(a.name); });
-            });
-            old.replaceWith(replacement);
-            await Promise.resolve();
-            var hidden = getComputedStyle(document.getElementById('cluster')).display === 'none';
-            var moreMarked = replacement.querySelector('[aria-label="More"]').hasAttribute('data-grock-session-more');
-            var panel = document.createElement('div');
-            panel.className = 'h-dvh absolute';
-            panel.setAttribute('aria-hidden', 'false');
-            document.getElementById('grok-app-root').appendChild(panel);
-            await Promise.resolve();
-            var panelMarked = panel.hasAttribute('data-grock-right-panel');
-            panel.setAttribute('aria-hidden', 'true');
-            await Promise.resolve();
-            var panelCleared = !panel.hasAttribute('data-grock-right-panel');
-            replacement.querySelector('[aria-label="Create share link"]').disabled = true;
-            await Promise.resolve();
-            var disabledPosted = posted && posted.more === true && posted.share === false;
-            return {hidden:hidden, moreMarked:moreMarked, panelMarked:panelMarked, panelCleared:panelCleared,
-              disabledPosted:!!disabledPosted};
+            // The first mutation is unrelated; it must not conceal the header
+            // replacement that follows in the same observer delivery.
+            node('main-column').appendChild(document.createElement('span'));
+            var header = node('page-header');
+            header.replaceWith(header.cloneNode(true));
+            var hidden = blanked('title') && blanked('actions');
+            node('actions').setAttribute('aria-busy', 'true');
+            await sleep(350);
+            return { hidden: hidden, more: window.__grockChrome.session().more };
           } finally {
-            handler.postMessage = post;
             window.requestAnimationFrame = raf;
             window.cancelAnimationFrame = cancel;
-            window.__grockChrome.set();
           }
         """) as? [String: Bool]
-        for key in ["hidden", "moreMarked", "panelMarked", "panelCleared", "disabledPosted"] {
-            XCTAssertEqual(result?[key], true, key)
-        }
-        await fulfillment(of: [disabledShare], timeout: 4)
+        XCTAssertEqual(result, ["hidden": true, "more": false])
+        await fulfillment(of: [busyReported], timeout: 4)
     }
 
-    private static let chromePerformanceFixture = """
-    <!DOCTYPE html><html><body>
-      <div id="grok-app-root">
-        <aside data-sidebar="sidebar"><button data-sidebar="rail"></button></aside>
-        <main id="grok-content-area" style="height:600px">
-          <div id="header" class="absolute inset-x-0 top-0 z-10 h-14">
-            <div id="cluster"><button aria-label="More"></button><button aria-label="Create share link"></button></div>
-          </div>
-          <div id="response" style="height:600px;overflow:auto"><p>Fixture response</p></div>
-        </main>
-      </div>
-    </body></html>
-    """
-
+    /// Logged out, the band is the way in: Sign in stays on screen, below the
+    /// titlebar, whatever Appearance says about Private.
     @MainActor
-    func testSessionClusterStaysOnHome() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body style="margin:0">
-          <main id="grok-content-area" style="position:relative;height:600px;width:800px">
-            <div class="absolute inset-x-0 top-0 z-10 flex h-14" style="position:absolute;top:0;right:0;left:0;height:56px;display:flex;justify-content:flex-end">
-              <div id="cluster" class="flex flex-row items-center" style="display:flex;flex-direction:row;align-items:center;gap:6px">
-                <button type="button" aria-label="More" style="width:32px;height:32px"></button>
-                <button type="button" aria-label="Share" style="width:32px;height:32px"></button>
-              </div>
-            </div>
-          </main>
-        </body>
-        </html>
+    func testLoggedOutHeaderKeepsSignInAndReportsSignedOut() async throws {
+        let header = """
+        <nav id="page-header" aria-label="Top navigation">
+          <a id="home" href="/" aria-label="Home page">Grok</a>
+          <span id="band-controls">
+            <button id="settings" type="button" aria-label="Settings"></button>
+            <a id="signin" href="/sign-in">Sign in</a>
+            <a id="signup" href="/sign-up">Sign up</a>
+          </span>
+        </nav>
         """
-        let marked = try await evaluateSessionCluster(html: html, url: "https://grok.com/")
-        XCTAssertEqual(marked["cluster"], false)
-        XCTAssertEqual(marked["hidden"], false)
-        XCTAssertEqual(marked["sessionMore"], false)
-        XCTAssertEqual(marked["sessionShare"], false)
-    }
-
-    @MainActor
-    func testHeaderVisibilityPreservesNewChatLayout() async throws {
-        // Cover both an in-flow row and the site's absolute header. The row
-        // gets its height from its controls, so hiding either control must
-        // leave the heading/composer geometry and the other control intact.
-        for absoluteHeader in [false, true] {
-            let html = """
-            <!DOCTYPE html><html><head><style>
-              html, body { margin:0; height:100%; }
-              main { position:relative; display:flex; flex-direction:column; height:100vh; }
-              #header { display:flex; justify-content:flex-end; flex-shrink:0; width:100%;
-                padding:8px; box-sizing:border-box; position:\(absoluteHeader ? "absolute" : "relative"); }
-              #header button { height:40px; }
-              #home { display:flex; flex-direction:column; justify-content:center;
-                align-items:center; flex:1; min-height:0; gap:24px; }
-              h1 { margin:0; }
-              form { width:80%; }
-              textarea { width:100%; height:100px; box-sizing:border-box; }
-            </style></head><body>
-              <main id="grok-content-area">
-                <div id="header" class="\(absoluteHeader ? "absolute inset-x-0 top-0 z-10 h-14" : "")">
-                  <button id="bot">Grok Bot</button><button id="private">Private</button>
-                </div>
-                <div id="home"><h1>What should we explore?</h1>
-                  <form><textarea id="prompt" aria-label="Ask Grok anything"></textarea></form>
-                </div>
-              </main>
-            </body></html>
-            """
-            let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
-            let window = try XCTUnwrap(webView.window)
-            defer { window.orderOut(nil) }
-
-            for size in [NSSize(width: 920, height: 680), NSSize(width: 720, height: 520)] {
-                window.setContentSize(size)
-                let result = try await callSessionJavaScript(webView, """
-                await new Promise(resolve => setTimeout(resolve, 250));
-                const states = [];
-                for (const [bot, priv] of [[false,false], [true,false], [false,true], [true,true], [false,false]]) {
-                  window.__grockChrome.set({ hideGrokBot:bot, hidePrivate:priv });
-                  // Also check a React-style header replacement while the
-                  // controls are hidden, after the coalesced observer runs.
-                  if (bot && priv) {
-                    const header = document.getElementById('header');
-                    const replacement = header.cloneNode(true);
-                    for (const el of [replacement, ...replacement.querySelectorAll('[data-grock-hide]')]) {
-                      el.removeAttribute('data-grock-hide');
-                    }
-                    header.replaceWith(replacement);
-                    await new Promise(resolve => setTimeout(resolve, 400));
-                  }
-                  function hidden(id) {
-                    const el = document.getElementById(id);
-                    const style = getComputedStyle(el);
-                    return style.visibility === 'hidden' || !el.getClientRects().length;
-                  }
-                  document.getElementById('prompt').focus();
-                  document.getElementById('bot').focus();
-                  const botFocused = document.activeElement.id === 'bot';
-                  document.getElementById('prompt').focus();
-                  document.getElementById('private').focus();
-                  const privateFocused = document.activeElement.id === 'private';
-                  const heading = document.querySelector('h1').getBoundingClientRect();
-                  const prompt = document.getElementById('prompt').getBoundingClientRect();
-                  states.push({ botHidden:hidden('bot'), privateHidden:hidden('private'),
-                    botFocused, privateFocused, headingTop:heading.top, promptTop:prompt.top,
-                    promptBottom:prompt.bottom, headerHeight:document.getElementById('header').offsetHeight });
-                }
-                return states;
-                """)
-                let states = try XCTUnwrap(result as? [[String: Any]])
-                XCTAssertEqual(states.count, 5)
-                let baseline = try XCTUnwrap(states.first)
-                for (state, flags) in zip(states, [(false, false), (true, false), (false, true), (true, true), (false, false)]) {
-                    let context = "absolute=\(absoluteHeader), size=\(size), hidden=\(flags)"
-                    XCTAssertEqual(state["botHidden"] as? Bool, flags.0, context)
-                    XCTAssertEqual(state["privateHidden"] as? Bool, flags.1, context)
-                    XCTAssertEqual(state["botFocused"] as? Bool, !flags.0, context)
-                    XCTAssertEqual(state["privateFocused"] as? Bool, !flags.1, context)
-                    for key in ["headingTop", "promptTop", "headerHeight"] {
-                        XCTAssertEqual(try XCTUnwrap(state[key] as? Double),
-                                       try XCTUnwrap(baseline[key] as? Double), accuracy: 1, "\(key): \(context)")
-                    }
-                    XCTAssertGreaterThan(try XCTUnwrap(state["headingTop"] as? Double), 52, context)
-                    XCTAssertLessThanOrEqual(try XCTUnwrap(state["promptBottom"] as? Double), size.height, context)
-                }
-            }
-        }
-    }
-
-    @MainActor
-    func testLoggedOutHomeKeepsOnlySignInInWebHeader() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body style="margin:0">
-          <main id="grok-content-area" style="position:relative;height:600px;width:800px">
-            <div id="auth-header" class="absolute inset-x-0 top-0 z-10 flex h-14" style="position:absolute;top:0;right:0;left:0;height:56px;display:flex;justify-content:flex-end">
-              <a id="home" href="/" aria-label="Home page">Grok</a>
-              <a id="imagine" href="/imagine">Imagine</a>
-              <button id="settings" type="button" aria-label="Settings"></button>
-              <button id="signin" type="button">Sign in</button>
-              <button id="signup" type="button">Sign up</button>
-            </div>
-          </main>
-        </body>
-        </html>
-        """
+        let html = GrokShellFixture.page(header: header, content: GrokShellFixture.hero, signedIn: false)
         let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
-        let result = try await callSessionJavaScript(
-            webView,
-            """
-            function hidden(id) {
-              var el = document.getElementById(id);
-              while (el) {
-                var style = getComputedStyle(el);
-                if (style.display === 'none' || style.visibility === 'hidden') return true;
-                el = el.parentElement;
-              }
-              return false;
-            }
-            var header = document.getElementById('auth-header');
-            return {
-              pageHeaderHidden: document.documentElement.hasAttribute('data-grock-page-header-hidden'),
-              headerHidden: hidden('auth-header'),
-              signInHidden: hidden('signin'),
-              homeHidden: hidden('home'),
-              imagineHidden: hidden('imagine'),
-              settingsHidden: hidden('settings'),
-              signUpHidden: hidden('signup'),
-              headerTop: getComputedStyle(header).top,
-              authenticated: window.__grockChrome.session().authenticated
-            };
-            """
-        ) as? [String: Any]
-        XCTAssertEqual(result?["pageHeaderHidden"] as? Bool, false)
-        XCTAssertEqual(result?["headerHidden"] as? Bool, false)
-        XCTAssertEqual(result?["signInHidden"] as? Bool, false)
-        XCTAssertEqual(result?["homeHidden"] as? Bool, true)
-        XCTAssertEqual(result?["imagineHidden"] as? Bool, true)
-        XCTAssertEqual(result?["settingsHidden"] as? Bool, true)
-        XCTAssertEqual(result?["signUpHidden"] as? Bool, true)
-        XCTAssertEqual(result?["headerTop"] as? String, "52px")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          var chrome = window.__grockChrome;
+          chrome.set({ hidePrivate: true });
+          var out = {
+            flagged: document.documentElement.hasAttribute('data-grock-page-header-hidden'),
+            headerSeen: seen('page-header'), signInSeen: seen('signin'),
+            headerTop: node('page-header').getBoundingClientRect().top,
+            homeGone: gone('home'), settingsGone: gone('settings'), signUpGone: gone('signup'),
+            authenticated: chrome.session().authenticated
+          };
+          // Signing in swaps the links for Private and adds the account row.
+          node('band-controls').innerHTML =
+            '<button id="private" aria-pressed="false" aria-label="Switch to Private Chat">Private</button>';
+          node('app-sidebar').insertAdjacentHTML('beforeend',
+            '<button data-account-trigger aria-label="Account menu for Example User"></button>');
+          chrome.set();
+          out.signedInBlanked = blanked('page-header');
+          out.signedInAuthenticated = chrome.session().authenticated;
+          return out;
+        """) as? [String: Any]
+        XCTAssertEqual(result?["flagged"] as? Bool, false)
+        XCTAssertEqual(result?["headerSeen"] as? Bool, true)
+        XCTAssertEqual(result?["signInSeen"] as? Bool, true)
+        XCTAssertEqual(try XCTUnwrap(result?["headerTop"] as? Double), 52, accuracy: 0.5)
+        // Signed out, Sign in is the only thing the band offers.
+        XCTAssertEqual(result?["homeGone"] as? Bool, true)
+        XCTAssertEqual(result?["settingsGone"] as? Bool, true)
+        XCTAssertEqual(result?["signUpGone"] as? Bool, true)
         XCTAssertEqual(result?["authenticated"] as? Bool, false)
+        XCTAssertEqual(result?["signedInBlanked"] as? Bool, true)
+        XCTAssertEqual(result?["signedInAuthenticated"] as? Bool, true)
+    }
 
-        let signedIn = try await callSessionJavaScript(
-            webView,
+    /// The signed-out band in the full shell: a header like the signed-in one,
+    /// with the logo, Settings, Sign in, and Sign up. Google's one-tap card
+    /// floats over the titlebar's corner; the cookie notice must stay.
+    @MainActor
+    func testSignedOutShellShowsOnlySignInAndTheCookieNotice() async throws {
+        let header = """
+        <header id="page-header">
+          <a id="home" href="/" aria-label="Home page">Grok</a>
+          <span data-context-tray-yield>
+            <div>
+              <span><button id="settings" type="button" aria-label="Settings" aria-haspopup="menu"></button></span>
+              <a id="signin" href="/sign-in?return_to=%2F"><span>Sign in</span></a>
+              <a id="signup" href="/sign-up?return_to=%2F"><span>Sign up</span></a>
+            </div>
+          </span>
+        </header>
+        """
+        let outside = """
+        <div id="credential_picker_container" style="position:fixed;top:20px;right:20px;width:390px;height:150px">
+          <iframe title="Sign in with Google Dialog"></iframe>
+        </div>
+        <div id="cookies" role="dialog" aria-label="Cookie notice" data-cookie-banner="true"
+             style="position:fixed;right:16px;bottom:16px;width:520px;height:150px">
+          <p>We use essential cookies. See our Cookie Policy.</p>
+          <button aria-label="Dismiss cookie notice">Close</button>
+          <button>Reject All</button><button>Accept All Cookies</button>
+        </div>
+        """
+        let html = GrokShellFixture.page(
+            header: header, content: GrokShellFixture.hero, signedIn: false, outside: outside
+        )
+        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, Self.domProbes + """
+          window.__grockChrome.set({ hidePrivate: true });
+          return {
+            signInSeen: seen('signin'), headerTop: node('page-header').getBoundingClientRect().top,
+            homeGone: gone('home'), settingsGone: gone('settings'), signUpGone: gone('signup'),
+            oneTapGone: gone('credential_picker_container'), cookiesSeen: seen('cookies'),
+            authenticated: window.__grockChrome.session().authenticated
+          };
+        """) as? [String: Any]
+        XCTAssertEqual(result?["signInSeen"] as? Bool, true)
+        XCTAssertEqual(try XCTUnwrap(result?["headerTop"] as? Double), 52, accuracy: 0.5)
+        XCTAssertEqual(result?["homeGone"] as? Bool, true)
+        XCTAssertEqual(result?["settingsGone"] as? Bool, true)
+        XCTAssertEqual(result?["signUpGone"] as? Bool, true)
+        XCTAssertEqual(result?["oneTapGone"] as? Bool, true)
+        XCTAssertEqual(result?["cookiesSeen"] as? Bool, true)
+        XCTAssertEqual(result?["authenticated"] as? Bool, false)
+    }
+
+    /// Sign in can also sit in the sidebar, with an ordinary band over the chat.
+    @MainActor
+    func testSignInAnywhereInTheShellReportsSignedOut() async throws {
+        let html = GrokShellFixture.page(
+            content: GrokShellFixture.hero,
+            sidebar: "<button id=\"signin\">Sign in</button>",
+            signedIn: false
+        )
+        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, """
+          var chrome = window.__grockChrome;
+          var signedOut = chrome.session().authenticated;
+          document.getElementById('signin').remove();
+          document.getElementById('app-sidebar').insertAdjacentHTML('beforeend',
+            '<button data-account-trigger aria-label="Account menu for Example User"></button>');
+          return { signedOut: signedOut, signedIn: chrome.session().authenticated };
+        """) as? [String: Bool]
+        XCTAssertEqual(result, ["signedOut": false, "signedIn": true])
+    }
+
+    /// The sidebar lists the user's own chats, projects, and bots by name. A
+    /// name is not a Sign in control, whatever it says.
+    @MainActor
+    func testSidebarRowsNamedSignInDoNotSignTheUserOut() async throws {
+        let webView = try await loadSessionFixture(html: Self.homeFixture, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, """
+          var chrome = window.__grockChrome;
+          var before = chrome.session().authenticated;
+          function rename(id, name) {
+            document.getElementById(id).querySelector('[data-sidebar-item-label]').textContent = name;
+          }
+          rename('other-chat-row', 'Sign in page ideas');
+          rename('project-row', 'Log in flow');
+          chrome.set();
+          return { before: before, after: chrome.session().authenticated };
+        """) as? [String: Bool]
+        XCTAssertEqual(result, ["before": true, "after": true])
+    }
+
+    // MARK: - Promo cards (DEC-047)
+
+    /// grok.com's dismissible card: a region with a call to action and a
+    /// Dismiss button, floating in a corner of the main column.
+    private static func promoCard(
+        _ id: String,
+        title: String,
+        action: String = "See plans",
+        place: String = "right:12px;bottom:12px"
+    ) -> String {
+        """
+        <div id="\(id)" role="region" data-slot="card" aria-label="\(title)"
+             style="position:absolute;\(place);width:234px;height:144px">
+          <span data-slot="card-body">
+            <span data-slot="card-content"><span data-slot="card-title">\(title)</span></span>
+            <button type="button" onclick="window.promoClicked = true"><span>\(action)</span></button>
+          </span>
+          <button type="button" aria-label="Dismiss" onclick="window.promoClicked = true"></button>
+        </div>
+        """
+    }
+
+    @MainActor
+    func testChromeScriptHidesPromoCardsAndSkipsAccountNotices() async throws {
+        let cards = [
+            Self.promoCard("plans", title: "Unlock the full experience"),
+            Self.promoCard("feature", title: "Now with example feature", action: "Try it", place: "right:12px;top:60px"),
+            Self.promoCard("expired", title: "Your subscription expired"),
+            Self.promoCard("limit", title: "You are close to your usage limit"),
+            Self.promoCard("terms", title: "We've updated our Terms of Service", action: "Try again"),
+            Self.promoCard("centered", title: "Unlock the full experience", place: "left:150px;top:220px"),
+            Self.promoCard("notice", title: "Example notice", action: "Details")
+        ].joined()
+        let html = GrokShellFixture.page(
+            content: GrokShellFixture.hero + cards,
+            sidebar: Self.promoCard("in-sidebar", title: "Unlock the full experience", place: "left:8px;bottom:8px"),
+            outside: """
+            <div id="plans-dialog" role="dialog" data-open
+                 style="position:fixed;right:0;bottom:0;width:260px;height:170px">
+              \(Self.promoCard("in-dialog", title: "Unlock the full experience"))
+            </div>
             """
-            document.getElementById('signin').remove();
-            window.__grockChrome.set();
-            var header = document.getElementById('auth-header');
-            return {
-              headerHidden: getComputedStyle(header).display === 'none'
-                || header.hasAttribute('data-grock-hide'),
-              authenticated: window.__grockChrome.session().authenticated
-            };
-            """
-        ) as? [String: Any]
-        XCTAssertEqual(signedIn?["headerHidden"] as? Bool, true)
-        XCTAssertEqual(signedIn?["authenticated"] as? Bool, true)
+        )
+        let marks = try await evaluatePromoMarks(
+            html: html,
+            ids: ["plans", "feature", "expired", "limit", "terms", "centered", "notice", "in-dialog", "in-sidebar"]
+        )
+        XCTAssertEqual(marks["plans"], true)
+        XCTAssertEqual(marks["feature"], true)
+        // Money, limits, and legal notices are the account talking, not a campaign.
+        XCTAssertEqual(marks["expired"], false)
+        XCTAssertEqual(marks["limit"], false)
+        XCTAssertEqual(marks["terms"], false)
+        // Not in a corner, or nothing being sold.
+        XCTAssertEqual(marks["centered"], false)
+        XCTAssertEqual(marks["notice"], false)
+        // Dialogs and the sidebar are grok.com's own surfaces.
+        XCTAssertEqual(marks["in-dialog"], false)
+        XCTAssertEqual(marks["in-sidebar"], false)
+        XCTAssertEqual(marks["noPromoClick"], true)
     }
 
     @MainActor
@@ -3336,239 +3624,177 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(injected?["hidden"] as? Bool, false)
     }
 
+    /// The titlebar's More and Share are native. They read and pick from
+    /// grok.com's one Conversation Actions menu, opened out of sight.
     @MainActor
-    func testSessionMenuInspectionAndCommandsUseTheCurrentWebMenu() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body style="margin:0">
-          <div role="menu" aria-labelledby="another-trigger" data-state="open">
-            <button role="menuitem" onclick="document.body.dataset.wrongMenu='true'">Pin</button>
-            <button role="menuitem" onclick="document.body.dataset.wrongMenu='true'">Delete Chat</button>
-          </div>
-          <div id="grok-app-root">
-          <main id="grok-content-area" style="position:relative;height:600px;width:800px">
-            <div class="absolute inset-x-0 top-0 z-10 flex h-14" style="position:absolute;top:0;right:0;left:0;height:56px;display:flex;justify-content:flex-end">
-              <div id="cluster" class="flex flex-row items-center" style="display:flex;gap:6px">
-                <button id="more" type="button" aria-label="More" aria-haspopup="menu" aria-expanded="false"></button>
-                <button id="share" type="button" aria-label="Create share link"></button>
-                <div class="h-8 shrink-0 overflow-hidden pointer-events-none"></div>
+    func testConversationActionsRunThroughTheHiddenWebMenu() async throws {
+        let html = GrokShellFixture.page(
+            header: GrokShellFixture.conversationHeader,
+            content: GrokShellFixture.transcript + GrokShellFixture.composer,
+            outside: """
+            <div role="presentation" data-open>
+              <div role="menu" data-open aria-labelledby="another-trigger">
+                <div role="menuitem" onclick="window.wrongMenu = true">Pin</div>
+                <div role="menuitem" onclick="window.wrongMenu = true">Archive</div>
               </div>
             </div>
-          </main>
-          <div class="h-dvh absolute" aria-hidden="false"></div>
-          <div>
-            <button aria-label="Expand"></button>
-            <button aria-label="Toggle Right Panel" aria-pressed="true" onclick="document.body.dataset.panelClicked='true'"></button>
-          </div>
-          </div>
-          <script>
-            var pinned = true;
-            var popup = null;
-            function closeMenu() {
-              if (popup) popup.dataset.state = 'closed';
-              document.getElementById('more').setAttribute('aria-expanded', 'false');
-            }
-            document.addEventListener('keydown', function (event) {
-              if (event.key === 'Escape') closeMenu();
-            });
-            document.getElementById('more').addEventListener('pointerdown', function () {
-              if (popup && popup.dataset.state === 'open') { closeMenu(); return; }
-              if (popup) popup.remove();
-              popup = document.createElement('div');
-              popup.setAttribute('role', 'menu');
-              popup.setAttribute('aria-labelledby', 'more');
-              popup.dataset.state = 'open';
-              document.getElementById('more').setAttribute('aria-expanded', 'true');
-              function item(text, action) {
-                var button = document.createElement('button');
-                button.setAttribute('role', 'menuitem');
-                button.textContent = text;
-                button.addEventListener('click', action);
-                popup.appendChild(button);
-              }
-              item(pinned ? 'Unpin' : 'Pin', function () {
-                pinned = !pinned;
-                document.body.dataset.pinned = String(pinned);
-                closeMenu();
-              });
-              item('Toggle Right Panel', function () {
-                document.body.dataset.panelClicked = 'true';
-                closeMenu();
-              });
-              item('Delete Chat', function () {
-                document.body.dataset.deleted = 'true';
-                closeMenu();
-                var confirmation = document.createElement('div');
-                confirmation.id = 'confirm-delete';
-                confirmation.setAttribute('role', 'alertdialog');
-                confirmation.tabIndex = -1;
-                confirmation.textContent = 'Confirm deletion';
-                document.body.appendChild(confirmation);
-                confirmation.focus();
-              });
-              document.body.appendChild(popup);
-            });
-          </script>
-        </body>
-        </html>
-        """
+            """ + GrokShellFixture.conversationMenu(project: "submenu")
+        )
         let webView = try await loadSessionFixture(html: html, url: "https://grok.com/c/fixture")
 
-        let first = try await callSessionJavaScript(
-            webView,
-            "return await window.__grockChrome.inspectSessionMenu();"
-        ) as? [String: Any]
-        XCTAssertEqual(first?["pin"] as? String, "unpin")
-        XCTAssertEqual(first?["panel"] as? Bool, true)
-        let sourceMenuOpen = try await callSessionJavaScript(
-            webView,
-            "return !!document.querySelector('[role=menu][aria-labelledby=more][data-state=open]');"
-        ) as? Bool
-        XCTAssertEqual(sourceMenuOpen, false)
-
-        let replacementShare = try await callSessionJavaScript(webView, """
-          var old = document.getElementById('share');
-          var replacement = document.createElement('button');
-          replacement.id = 'share';
-          replacement.setAttribute('aria-label', 'Create share link');
-          replacement.addEventListener('click', function () {
-            document.body.dataset.shared = 'true';
-          });
-          old.replaceWith(replacement);
-          var result = await window.__grockChrome.clickSession('share');
-          return result + ':' + document.body.dataset.shared;
-        """) as? String
-        XCTAssertEqual(replacementShare, "clicked:true")
-
-        let pinResult = try await callSessionJavaScript(
-            webView,
-            "return await window.__grockChrome.clickSession('pin');"
-        ) as? String
-        XCTAssertEqual(pinResult, "clicked")
-        let pinned = try await callSessionJavaScript(
-            webView,
-            "return document.body.dataset.pinned;"
-        ) as? String
-        XCTAssertEqual(pinned, "false")
-        let second = try await callSessionJavaScript(
-            webView,
-            "return await window.__grockChrome.inspectSessionMenu();"
-        ) as? [String: Any]
-        XCTAssertEqual(second?["pin"] as? String, "pin")
-
-        let panelResult = try await callSessionJavaScript(
-            webView,
-            "return await window.__grockChrome.clickSession('panel');"
-        ) as? String
-        XCTAssertEqual(panelResult, "clicked")
-        let panelClicked = try await callSessionJavaScript(
-            webView,
-            "return document.body.dataset.panelClicked;"
-        ) as? String
-        XCTAssertEqual(panelClicked, "true")
-        let deleteResult = try await callSessionJavaScript(
-            webView,
-            "return await window.__grockChrome.clickSession('delete');"
-        ) as? String
-        XCTAssertEqual(deleteResult, "clicked")
-        let deleted = try await callSessionJavaScript(
-            webView,
-            "return document.body.dataset.deleted;"
-        ) as? String
-        XCTAssertEqual(deleted, "true")
-        let cleanup = try await callSessionJavaScript(webView, """
+        let inspected = try await callSessionJavaScript(webView, """
+          document.getElementById('composer').focus();
+          var state = await window.__grockChrome.inspectSessionMenu();
+          var fx = window.fixture;
           return {
-            hidden: document.documentElement.hasAttribute('data-grock-picking-menu'),
-            focus: document.activeElement.id,
-            wrongMenu: document.body.dataset.wrongMenu || 'false'
+            pin: state.pin, panel: state.panel, project: state.project, archive: state.archive,
+            suppressedAtOpen: fx.suppressedAtOpen, markedAtClose: fx.markedAtClose, opacityAtClose: fx.opacityAtClose,
+            menuOpen: !!document.getElementById('menu'), escapes: fx.menuEscapes, triggerClicks: fx.triggerClicks,
+            stillSuppressed: document.documentElement.hasAttribute('data-grock-picking-menu'),
+            focus: document.activeElement.id
           };
         """) as? [String: Any]
-        XCTAssertEqual(cleanup?["hidden"] as? Bool, false)
-        XCTAssertEqual(cleanup?["focus"] as? String, "confirm-delete")
-        XCTAssertEqual(cleanup?["wrongMenu"] as? String, "false")
+        XCTAssertEqual(inspected?["pin"] as? String, "pin")
+        XCTAssertEqual(inspected?["panel"] as? Bool, true)
+        XCTAssertEqual(inspected?["project"] as? Bool, true)
+        XCTAssertEqual(inspected?["archive"] as? Bool, true)
+        // Out of sight from the click that opens it until it closes.
+        XCTAssertEqual(inspected?["suppressedAtOpen"] as? Bool, true)
+        XCTAssertEqual(inspected?["markedAtClose"] as? Bool, true)
+        XCTAssertEqual(inspected?["opacityAtClose"] as? String, "0")
+        // Closed again before AppKit shows its copy, with the page as it was.
+        XCTAssertEqual(inspected?["menuOpen"] as? Bool, false)
+        XCTAssertEqual(inspected?["escapes"] as? Int, 1)
+        XCTAssertEqual(inspected?["triggerClicks"] as? Int, 1)
+        XCTAssertEqual(inspected?["stillSuppressed"] as? Bool, false)
+        XCTAssertEqual(inspected?["focus"] as? String, "composer")
 
-        // A remounted trigger with no handler must not reuse the closed source
-        // menu, choose the unrelated menu, or leave the page's menus hidden.
+        let picked = try await callSessionJavaScript(webView, """
+          var chrome = window.__grockChrome, fx = window.fixture;
+          var out = {};
+          out.pin = await chrome.clickSession('pin');
+          out.pinned = fx.pinned;
+          out.afterPin = (await chrome.inspectSessionMenu()).pin;
+          // Two requests at once take turns; a second click would close the menu.
+          var both = await Promise.all([chrome.inspectSessionMenu(), chrome.clickSession('pin')]);
+          out.queuedPin = both[0].pin;
+          out.unpin = both[1];
+          out.unpinned = !fx.pinned;
+          out.share = await chrome.clickSession('share');
+          fx.shareDisabled = true;
+          out.disabledShare = await chrome.clickSession('share');
+          out.menuOpenAfterDisabled = !!document.getElementById('menu');
+          var clicksBefore = fx.triggerClicks;
+          out.deleted = await chrome.clickSession('delete');
+          out.more = await chrome.clickSession('more');
+          out.unknownOpenedMenu = fx.triggerClicks !== clicksBefore;
+          out.clicked = fx.clicked;
+          return out;
+        """) as? [String: Any]
+        XCTAssertEqual(picked?["pin"] as? String, "clicked")
+        XCTAssertEqual(picked?["pinned"] as? Bool, true)
+        XCTAssertEqual(picked?["afterPin"] as? String, "unpin")
+        XCTAssertEqual(picked?["queuedPin"] as? String, "unpin")
+        XCTAssertEqual(picked?["unpin"] as? String, "clicked")
+        XCTAssertEqual(picked?["unpinned"] as? Bool, true)
+        XCTAssertEqual(picked?["share"] as? String, "clicked")
+        XCTAssertEqual(picked?["disabledShare"] as? String, "unavailable")
+        XCTAssertEqual(picked?["menuOpenAfterDisabled"] as? Bool, false)
+        // grok.com has no Delete any more, and More is not an action.
+        XCTAssertEqual(picked?["deleted"] as? String, "unknown")
+        XCTAssertEqual(picked?["more"] as? String, "unknown")
+        XCTAssertEqual(picked?["unknownOpenedMenu"] as? Bool, false)
+        XCTAssertEqual(picked?["clicked"] as? [String], ["Pin", "Unpin", "Share"])
+
+        let archived = try await callSessionJavaScript(webView, """
+          var fx = window.fixture;
+          var escapesBefore = fx.documentEscapes;
+          var result = await window.__grockChrome.clickSession('archive');
+          return {
+            result: result, clicked: fx.clicked[fx.clicked.length - 1],
+            // Escape after the item closed its menu would dismiss the confirmation.
+            strayEscapes: fx.documentEscapes - escapesBefore,
+            confirming: !!document.getElementById('confirm-archive'),
+            focus: document.activeElement.id,
+            stillSuppressed: document.documentElement.hasAttribute('data-grock-picking-menu'),
+            wrongMenu: window.wrongMenu === true
+          };
+        """) as? [String: Any]
+        XCTAssertEqual(archived?["result"] as? String, "clicked")
+        XCTAssertEqual(archived?["clicked"] as? String, "Archive")
+        XCTAssertEqual(archived?["strayEscapes"] as? Int, 0)
+        XCTAssertEqual(archived?["confirming"] as? Bool, true)
+        XCTAssertEqual(archived?["focus"] as? String, "confirm-archive")
+        XCTAssertEqual(archived?["stillSuppressed"] as? Bool, false)
+        XCTAssertEqual(archived?["wrongMenu"] as? Bool, false)
+
+        // A remounted trigger with no handler must not fall back to the
+        // unrelated menu, or leave the page's menus hidden.
         let failed = try await callSessionJavaScript(webView, """
-          document.getElementById('confirm-delete').remove();
-          var more = document.getElementById('more');
-          more.replaceWith(more.cloneNode(true));
+          document.getElementById('confirm-archive').remove();
+          var trigger = document.getElementById('actions');
+          trigger.replaceWith(trigger.cloneNode(true));
           var state = await window.__grockChrome.inspectSessionMenu();
           return {
-            pin: state.pin,
-            hidden: document.documentElement.hasAttribute('data-grock-picking-menu')
+            pin: state.pin, project: state.project, archive: state.archive,
+            pinResult: await window.__grockChrome.clickSession('pin'),
+            stillSuppressed: document.documentElement.hasAttribute('data-grock-picking-menu'),
+            wrongMenu: window.wrongMenu === true
           };
         """) as? [String: Any]
         XCTAssertEqual(failed?["pin"] as? String, "missing")
-        XCTAssertEqual(failed?["hidden"] as? Bool, false)
+        XCTAssertEqual(failed?["project"] as? Bool, false)
+        XCTAssertEqual(failed?["archive"] as? Bool, false)
+        XCTAssertEqual(failed?["pinResult"] as? String, "missing")
+        XCTAssertEqual(failed?["stillSuppressed"] as? Bool, false)
+        XCTAssertEqual(failed?["wrongMenu"] as? Bool, false)
     }
 
+    /// What `window.__grockChrome.session()` reports for `html` loaded at `url`.
     @MainActor
-    private func evaluateSessionCluster(html: String, url: String) async throws -> [String: Bool] {
+    private func evaluateSessionState(html: String, url: String) async throws -> [String: Bool] {
         let webView = try await loadSessionFixture(html: html, url: url)
-        let script = """
-        (function () {
-          if (window.__grockChrome && window.__grockChrome.set) window.__grockChrome.set();
-          var cluster = document.getElementById('cluster');
-          var more = cluster && cluster.querySelector('[aria-label="More"]');
-          var share = cluster && cluster.querySelector('[aria-label="Share"]');
-          var panel = cluster && cluster.querySelector('[aria-label="Toggle panel"]');
-          var state = window.__grockChrome && window.__grockChrome.session
-            ? window.__grockChrome.session()
-            : { more: false, share: false, panel: false };
-          var hidden = false;
-          if (cluster) {
-            var cs = window.getComputedStyle(cluster);
-            hidden = cs.display === 'none'
-              || cluster.hasAttribute('data-grock-session-cluster')
-              || !!(cluster.closest && cluster.closest('[data-grock-session-cluster]'));
-          }
-          return {
-            cluster: !!(cluster && cluster.hasAttribute('data-grock-session-cluster')),
-            more: !!(more && more.hasAttribute('data-grock-session-more')),
-            share: !!(share && share.hasAttribute('data-grock-session-share')),
-            panel: !!(panel && panel.hasAttribute('data-grock-session-panel')),
-            hidden: hidden,
-            sessionMore: !!state.more,
-            sessionShare: !!state.share,
-            sessionPanel: !!state.panel
-          };
-        })()
-        """
-        return try await withCheckedThrowingContinuation { continuation in
-            webView.evaluateJavaScript(script) { result, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                guard let dict = result as? [String: Any] else {
-                    continuation.resume(
-                        throwing: NSError(
-                            domain: "GrockTests",
-                            code: 4,
-                            userInfo: [NSLocalizedDescriptionKey: "session cluster was not a dictionary"]
-                        )
-                    )
-                    return
-                }
-                func flag(_ key: String) -> Bool {
-                    if let value = dict[key] as? Bool { return value }
-                    if let value = dict[key] as? NSNumber { return value.boolValue }
-                    return false
-                }
-                continuation.resume(returning: [
-                    "cluster": flag("cluster"),
-                    "more": flag("more"),
-                    "share": flag("share"),
-                    "panel": flag("panel"),
-                    "hidden": flag("hidden"),
-                    "sessionMore": flag("sessionMore"),
-                    "sessionShare": flag("sessionShare"),
-                    "sessionPanel": flag("sessionPanel")
-                ])
-            }
-        }
+        let result = try await callSessionJavaScript(webView, """
+          window.__grockChrome.set();
+          var state = window.__grockChrome.session();
+          return { more: state.more, share: state.share, panel: state.panel, authenticated: state.authenticated };
+        """)
+        return try XCTUnwrap(result as? [String: Bool], "session state was not a dictionary of flags")
+    }
+
+    /// Loads `html` at `url` with nothing injected, runs each source the way
+    /// `evaluateJavaScript` runs a production script, and returns their
+    /// results with whatever the `probe` expression reads back from the page.
+    @MainActor
+    private func runPageScripts(
+        _ sources: [String],
+        html: String,
+        url: String,
+        probe: String = "{}"
+    ) async throws -> (results: [String], page: [String: Any]) {
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = webView
+        window.orderFront(nil)
+        webView.layoutSubtreeIfNeeded()
+        let loaded = expectation(description: "page-script-fixture")
+        let loader = PlaceTitleHTMLLoader(expectation: loaded)
+        webView.navigationDelegate = loader
+        webView.loadHTMLString(html, baseURL: URL(string: url))
+        await fulfillment(of: [loaded], timeout: 4)
+        _ = window
+        let value = try await callSessionJavaScript(webView, """
+          var results = [];
+          for (var i = 0; i < sources.length; i++) results.push(String((0, eval)(sources[i])));
+          return { results: results, page: (0, eval)('(' + probe + ')') };
+        """, arguments: ["sources": sources, "probe": probe])
+        let body = try XCTUnwrap(value as? [String: Any], "page scripts did not return a dictionary")
+        return (body["results"] as? [String] ?? [], body["page"] as? [String: Any] ?? [:])
     }
 
     @MainActor
@@ -3611,132 +3837,32 @@ final class GrockTests: XCTestCase {
     }
 
     @MainActor
-    private func callSessionJavaScript(_ webView: WKWebView, _ script: String) async throws -> Any? {
+    private func callSessionJavaScript(
+        _ webView: WKWebView,
+        _ script: String,
+        arguments: [String: Any] = [:]
+    ) async throws -> Any? {
         return try await withCheckedThrowingContinuation { continuation in
-            webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
+            webView.callAsyncJavaScript(script, arguments: arguments, in: nil, in: .page) { result in
                 continuation.resume(with: result.map(Optional.some))
             }
         }
     }
 
+    /// Which of `ids` the chrome script took off the page, with the sidebar
+    /// shown so a card inside it is only gone if it was marked.
     @MainActor
-    private func evaluateContentInsetLayout(html: String) async throws -> [String: Any] {
-        let config = WKWebViewConfiguration()
-        config.userContentController.addUserScript(
-            WKUserScript(
-                source: WebViewStore.chromeScript,
-                injectionTime: .atDocumentStart,
-                forMainFrameOnly: true
-            )
-        )
-        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-            styleMask: [.titled],
-            backing: .buffered,
-            defer: false
-        )
-        window.contentView = webView
-        window.orderFront(nil)
-        webView.layoutSubtreeIfNeeded()
-        let loaded = expectation(description: "inset-html")
-        let loader = PlaceTitleHTMLLoader(expectation: loaded)
-        webView.navigationDelegate = loader
-        webView.loadHTMLString(html, baseURL: URL(string: "https://grok.com/c/fixture"))
-        await fulfillment(of: [loaded], timeout: 4)
-        let script = """
-        (function () {
-          if (window.__grockChrome && window.__grockChrome.set) window.__grockChrome.set();
-          function marked(id, attr) {
-            var el = document.getElementById(id);
-            return !!(el && el.getAttribute(attr));
-          }
-          var composer = document.getElementById('composer');
-          var toolbar = document.getElementById('code-toolbar');
-          var nav = document.getElementById('nav');
-          var cbox = composer ? composer.getBoundingClientRect() : null;
-          var tstyle = toolbar ? window.getComputedStyle(toolbar).position : '';
-          return {
-            threadInset: marked('thread', 'data-grock-content-inset'),
-            navInset: marked('nav', 'data-grock-content-inset') || marked('nav', 'data-grock-home-inset'),
-            colInset: marked('col', 'data-grock-content-inset') || marked('col', 'data-grock-home-inset'),
-            composerOnScreen: !!(cbox && cbox.bottom <= (window.innerHeight + 1) && cbox.height >= 80),
-            toolbarRelative: tstyle === 'relative',
-            navHeight: nav ? nav.offsetHeight : -1
-          };
-        })()
-        """
-        return try await withCheckedThrowingContinuation { continuation in
-            webView.evaluateJavaScript(script) { result, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                guard let dict = result as? [String: Any] else {
-                    continuation.resume(
-                        throwing: NSError(
-                            domain: "GrockTests",
-                            code: 3,
-                            userInfo: [NSLocalizedDescriptionKey: "inset layout was not a dictionary"]
-                        )
-                    )
-                    return
-                }
-                func flag(_ key: String) -> Bool {
-                    if let value = dict[key] as? Bool { return value }
-                    if let value = dict[key] as? NSNumber { return value.boolValue }
-                    return false
-                }
-                func intVal(_ key: String) -> Int {
-                    if let value = dict[key] as? Int { return value }
-                    if let value = dict[key] as? NSNumber { return value.intValue }
-                    return -1
-                }
-                continuation.resume(returning: [
-                    "threadInset": flag("threadInset"),
-                    "navInset": flag("navInset"),
-                    "colInset": flag("colInset"),
-                    "composerOnScreen": flag("composerOnScreen"),
-                    "toolbarRelative": flag("toolbarRelative"),
-                    "navHeight": intVal("navHeight")
-                ])
-            }
-        }
-    }
-
-    @MainActor
-    private func evaluatePromoMarks(html: String) async throws -> [String: Bool] {
-        let script = """
-        (function () {
-          if (window.__grockChrome && window.__grockChrome.set) window.__grockChrome.set();
-          function hidden(id) {
-            var el = document.getElementById(id);
-            if (!el) return false;
-            return !!(el.hasAttribute('data-grock-hide')
-              || el.querySelector('[data-grock-hide]')
-              || el.closest('[data-grock-hide]'));
-          }
-          function undrawn(id) {
-            return getComputedStyle(document.getElementById(id)).display === 'none';
-          }
-          return {
-            finance: hidden('finance-promo'),
-            imagine: hidden('imagine-promo'),
-            tos: hidden('tos-dialog'),
-            billing: hidden('billing-toast'),
-            xConnect: hidden('x-connect'),
-            grokBot: hidden('grok-bot-promo'),
-            buildMode: undrawn('build-mode-promo'),
-            buildModeDialog: undrawn('build-mode-dialog'),
-            otherPopover: undrawn('other-popover'),
-            unifyCard: undrawn('unify-card'),
-            unifyElsewhere: undrawn('unify-elsewhere'),
-            noPromoClick: window.promoClicked !== true
-          };
-        })()
-        """
-        let result = try await evaluateChromeFixture(html: html, url: "https://grok.com/", script: script)
-        return result.mapValues { ($0 as? NSNumber)?.boolValue ?? false }
+    private func evaluatePromoMarks(html: String, ids: [String]) async throws -> [String: Bool] {
+        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, """
+          window.__grockChrome.set({ sidebarHidden: false });
+          var marks = { noPromoClick: window.promoClicked !== true };
+          ids.forEach(function (id) {
+            marks[id] = document.getElementById(id).getClientRects().length === 0;
+          });
+          return marks;
+        """, arguments: ["ids": ids])
+        return try XCTUnwrap(result as? [String: Bool], "promo marks were not a dictionary of flags")
     }
 
     /// Loads `html` at `url` with the production chrome script in an 800×600
@@ -3843,8 +3969,14 @@ final class GrockTests: XCTestCase {
     }
 
     @MainActor
-    private func loadReplyObserver(html: String) async throws -> (WKWebView, NSWindow) {
+    private func loadReplyObserver(
+        html: String,
+        recorder: ReplyFixtureRecorder? = nil
+    ) async throws -> (WKWebView, NSWindow) {
         let config = WKWebViewConfiguration()
+        if let recorder {
+            config.userContentController.add(recorder, name: ReplyBridge.channelName)
+        }
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewStore.replyObserverScript,
@@ -3940,5 +4072,364 @@ private final class SessionFixtureBridge: NSObject, WKScriptMessageHandlerWithRe
         let body = message.body as? [String: Any] ?? [:]
         DispatchQueue.main.async { [bridge] in bridge.handler?(message.webView, body) }
         replyHandler(["ok": true], nil)
+    }
+}
+
+/// Records what the reply observer posts to native.
+private final class ReplyFixtureRecorder: NSObject, WKScriptMessageHandler {
+    private(set) var kinds: [String] = []
+    var onMessage: (([String: Any]) -> Void)?
+
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        let body = message.body as? [String: Any] ?? [:]
+        var kind = body["kind"] as? String ?? ""
+        if let generating = body["generating"] as? Bool { kind += ":\(generating)" }
+        kinds.append(kind)
+        onMessage?(body)
+    }
+}
+
+/// grok.com's shell after the November 2026 redesign (DEC-071), cut down to
+/// the ids, roles, labels, and `data-*` hooks the page scripts read. Every
+/// name and title in it is made up.
+enum GrokShellFixture {
+    /// The band over a new chat: Private, and nothing else.
+    static let homeHeader = """
+    <header id="page-header">
+      <span data-context-tray-yield>
+        <button id="private" aria-pressed="false" aria-label="Switch to Private Chat">Private</button>
+      </span>
+      <span aria-hidden="true"></span>
+    </header>
+    """
+
+    /// The band over a conversation: its title and the Conversation Actions menu.
+    static let conversationHeader = """
+    <header id="page-header" data-header-over-column>
+      <div id="title" data-testid="conversation-title"><span data-sidebar-item-label>Example chat</span></div>
+      <span data-context-tray-yield>
+        <button id="actions" data-testid="conversation-actions-trigger" aria-label="Conversation Actions"
+                aria-haspopup="menu" aria-expanded="false"></button>
+      </span>
+    </header>
+    """
+
+    static let composer = """
+    <div role="presentation">
+      <form id="composer-form" data-composer onsubmit="return false">
+        <div data-composer-field>
+          <div id="composer" contenteditable="true" role="textbox" aria-label="Message Grok"><p><br></p></div>
+        </div>
+        <button id="attach" type="button" data-testid="attach-button" aria-label="Add files, skills, and connectors"></button>
+        <button id="dictate" type="button" aria-label="Dictate"></button>
+        <button id="voice" type="button" aria-label="Voice mode" data-composer-action="voice"></button>
+      </form>
+    </div>
+    """
+
+    static let hero = """
+    <div data-empty-chat-hero>
+      <h1 id="hero">What should we explore?</h1>
+      \(composer)
+    </div>
+    """
+
+    static let transcript = """
+    <div id="transcript" role="log" aria-label="Conversation" aria-busy="false"
+         data-testid="chat-transcript-scroller">
+      <div data-plane-row="row-1">
+        <div data-user-message-row>
+          <div role="article" data-testid="user-message"><span data-bubble-text>Example question</span></div>
+        </div>
+      </div>
+      <div data-plane-row="row-2">
+        <div id="answer" role="article" data-testid="assistant-message"><p>Example answer</p></div>
+        <div data-testid="response-footer-actions">
+          <div role="toolbar" aria-label="Response actions">
+            <button type="button" aria-label="Copy response"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+
+    /// `header` and `content` go in the main column, `sidebar` at the end of
+    /// the sidebar, and `outside` after the shell, where grok.com portals its
+    /// menus and dialogs.
+    static func page(
+        header: String = homeHeader,
+        content: String = "",
+        sidebar: String = "",
+        signedIn: Bool = true,
+        outside: String = "",
+        title: String = "Grok"
+    ) -> String {
+        let account = signedIn ? """
+        <button id="account" type="button" data-account-trigger aria-haspopup="menu"
+                aria-label="Account menu for Example User"></button>
+        """ : ""
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>\(title)</title><style>
+          html, body { margin:0; height:100%; }
+          button { min-width:24px; min-height:24px; }
+          #grok-app-root { position:relative; display:flex; width:100vw; height:100vh; }
+          #app-sidebar { position:relative; width:254px; height:100%; }
+          section { position:relative; flex:1; min-width:0; height:100%; }
+          #grok-content-area, #main-column { position:relative; height:100vh; }
+          #page-header { position:absolute; top:0; left:0; right:0; height:56px; }
+          [data-empty-chat-hero] { display:flex; flex-direction:column; justify-content:center;
+            align-items:center; height:100%; }
+          #composer { width:320px; min-height:24px; }
+          #transcript { height:400px; overflow-y:scroll; }
+          #pane-yield { position:absolute; top:14px; right:14px; }
+          #right-pane { position:absolute; top:0; right:0; width:0; height:100%; overflow:hidden; }
+          #leading-box { position:absolute; top:12px; left:12px; }
+        </style></head>
+        <body>
+          <div id="grok-app-root" data-desktop-shell>
+            <div id="sidebar-box">
+              <aside id="app-sidebar" aria-label="App navigation">
+                <header></header>
+                <button id="new-chat" type="button" aria-keyshortcuts="Meta+J">
+                  <span data-sidebar-item-label>New chat</span>
+                  <span data-slot="sidebar-item-shortcut"><span aria-hidden="true">J</span></span>
+                </button>
+                <div data-slot="sidebar-scrolling-content">
+                  <div id="library-box">
+                    <button id="library" type="button"><span data-sidebar-item-label>Library</span></button>
+                  </div>
+                  <div id="bots" data-reorder-item="bots"><div data-open>
+                    <button type="button" data-panel-open aria-expanded="true"><span>Bots</span></button>
+                    <button type="button" aria-label="New bot"></button>
+                    <div data-open>
+                      <button id="bot-row" type="button"><span data-sidebar-item-label>Example bot</span></button>
+                    </div>
+                  </div></div>
+                  <div id="projects" data-reorder-item="projects"><div data-open>
+                    <button type="button" data-panel-open aria-expanded="true"><span>Projects</span></button>
+                    <button type="button" aria-label="New project"></button>
+                    <div data-open>
+                      <div data-closed>
+                        <button id="project-row" type="button" data-project-row="project-1">
+                          <span data-sidebar-item-label>Untitled project</span>
+                        </button>
+                        <button id="project-new-chat" type="button" aria-label="New chat in Untitled project"></button>
+                      </div>
+                    </div>
+                  </div></div>
+                  <div id="recent" data-reorder-item="recent"><div data-open>
+                    <button type="button" data-panel-open aria-expanded="true"><span>Chats</span></button>
+                    <button id="chats-new-chat" type="button" aria-label="New chat"></button>
+                    <div data-open>
+                      <button id="chat-row" type="button"><span data-sidebar-item-label>Example chat</span></button>
+                      <button type="button" aria-label="Actions for Example chat" aria-haspopup="menu"></button>
+                      <button id="other-chat-row" type="button"><span data-sidebar-item-label>Another chat</span></button>
+                    </div>
+                  </div></div>
+                </div>
+                <footer>
+                  \(account)
+                  <button id="connect" type="button" aria-label="Connect apps" data-account-action></button>
+                </footer>
+                <div id="resize" role="separator" aria-controls="app-sidebar" aria-label="Resize sidebar"></div>
+                \(sidebar)
+              </aside>
+            </div>
+            <span hidden></span>
+            <section>
+              <div>
+                <div id="grok-content-area" role="main">
+                  <div id="main-column">
+                    \(header)
+                    \(content)
+                  </div>
+                </div>
+              </div>
+              <span id="pane-yield" data-context-tray-yield>
+                <button id="pane-toggle" type="button" aria-label="Toggle right pane" aria-expanded="false"></button>
+              </span>
+              <aside id="right-pane" aria-label="Right pane" aria-hidden="true" inert tabindex="-1">
+                <header>
+                  <div role="toolbar" aria-label="Pane actions">
+                    <button type="button" aria-label="New tab"></button>
+                    <button id="hide-pane" type="button" aria-label="Hide pane" aria-controls="right-pane"
+                            aria-expanded="true"></button>
+                  </div>
+                </header>
+              </aside>
+            </section>
+            <span id="leading-box">
+              <span id="leading" data-leading-chrome>
+                <button id="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-controls="app-sidebar"
+                        aria-expanded="true"></button>
+                <button id="search" type="button" aria-label="Search"></button>
+              </span>
+            </span>
+          </div>
+          \(outside)
+        </body>
+        </html>
+        """
+    }
+
+    /// Conversation Actions as grok.com builds it: a click on the trigger
+    /// mounts `[role="menu"]` (labelled by the trigger) inside a
+    /// `[role="presentation"]` positioner a moment later and gives it focus; a
+    /// second click closes it; Escape on the menu, or picking an item,
+    /// unmounts it and anything nested in it. `project` is how Add to Project
+    /// behaves: "submenu" (ArrowRight opens a nested menu and the parent stays
+    /// open), "dialog" (a click swaps the menu for a dialog), or "none".
+    /// `window.fixture` records what happened.
+    static func conversationMenu(project: String) -> String {
+        """
+        <script>
+        (function () {
+          var trigger = document.getElementById('actions');
+          var projectKind = '\(project)';
+          var fx = window.fixture = {
+            pinned: false, shareDisabled: false, moved: false, clicked: [],
+            triggerClicks: 0, menuEscapes: 0, pickerEscapes: 0, documentEscapes: 0,
+            suppressedAtOpen: null, markedAtClose: null, opacityAtClose: null
+          };
+          document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') fx.documentEscapes++;
+          });
+          var opening = false;
+          function menu() { return document.getElementById('menu'); }
+          function closePicker() {
+            var picker = document.getElementById('project-picker');
+            if (!picker) return;
+            if (picker.parentElement.getAttribute('role') === 'presentation') picker.parentElement.remove();
+            else picker.remove();
+          }
+          function closeMenu() {
+            opening = false;
+            var el = menu();
+            if (!el) return;
+            fx.markedAtClose = el.hasAttribute('data-grock-session-menu');
+            fx.opacityAtClose = getComputedStyle(el).opacity;
+            var picker = document.getElementById('project-picker');
+            if (picker && picker.hasAttribute('data-nested')) closePicker();
+            el.parentElement.remove();
+            document.getElementById('actions').setAttribute('aria-expanded', 'false');
+          }
+          function openPicker(nested) {
+            var picker = document.createElement('div');
+            picker.id = 'project-picker';
+            picker.setAttribute('data-open', '');
+            picker.setAttribute('role', nested ? 'menu' : 'dialog');
+            if (nested) picker.setAttribute('data-nested', '');
+            var field = document.createElement('input');
+            field.id = 'project-search';
+            field.setAttribute('role', 'combobox');
+            field.setAttribute('aria-label', 'Search projects');
+            var choice = document.createElement('div');
+            choice.id = 'project-choice';
+            choice.setAttribute('role', nested ? 'menuitem' : 'button');
+            choice.textContent = 'Untitled project';
+            choice.addEventListener('click', function () {
+              fx.moved = true;
+              closePicker();
+              closeMenu();
+            });
+            picker.append(field, choice);
+            picker.addEventListener('keydown', function (event) {
+              if (event.key !== 'Escape') return;
+              fx.pickerEscapes++;
+              closePicker();
+            });
+            if (nested) {
+              var positioner = document.createElement('div');
+              positioner.id = 'projects-positioner';
+              positioner.setAttribute('role', 'presentation');
+              positioner.setAttribute('data-open', '');
+              positioner.style.cssText = 'position:absolute;top:0;left:0;transform:translate(300px,20px)';
+              positioner.appendChild(picker);
+              document.body.appendChild(positioner);
+            } else {
+              closeMenu();
+              document.body.appendChild(picker);
+            }
+            field.focus();
+          }
+          function item(label, onClick) {
+            var el = document.createElement('div');
+            el.setAttribute('role', 'menuitem');
+            el.tabIndex = -1;
+            el.textContent = label;
+            el.addEventListener('click', function () {
+              fx.clicked.push(label);
+              onClick();
+            });
+            return el;
+          }
+          trigger.addEventListener('click', function () {
+            fx.triggerClicks++;
+            if (menu() || opening) { closeMenu(); return; }
+            fx.suppressedAtOpen = document.documentElement.hasAttribute('data-grock-picking-menu');
+            opening = true;
+            setTimeout(function () {
+              if (opening) mount();
+            }, 10);
+          });
+          function mount() {
+            opening = false;
+            var positioner = document.createElement('div');
+            positioner.setAttribute('role', 'presentation');
+            positioner.setAttribute('data-open', '');
+            positioner.style.cssText = 'position:absolute;top:0;left:0;transform:translate(520px,48px)';
+            var el = document.createElement('div');
+            el.id = 'menu';
+            el.setAttribute('role', 'menu');
+            el.setAttribute('data-open', '');
+            el.setAttribute('aria-labelledby', trigger.id);
+            el.tabIndex = -1;
+            el.addEventListener('keydown', function (event) {
+              if (event.key !== 'Escape') return;
+              fx.menuEscapes++;
+              closeMenu();
+            });
+            var share = item('Share', closeMenu);
+            if (fx.shareDisabled) share.setAttribute('aria-disabled', 'true');
+            el.appendChild(share);
+            el.appendChild(item(fx.pinned ? 'Unpin' : 'Pin', function () {
+              fx.pinned = !fx.pinned;
+              closeMenu();
+            }));
+            el.appendChild(item('Rename', closeMenu));
+            if (projectKind === 'submenu') {
+              var submenu = item('Add to Project', function () {});
+              submenu.id = 'add-to-project';
+              submenu.setAttribute('aria-haspopup', 'menu');
+              submenu.addEventListener('keydown', function (event) {
+                if (event.key === 'ArrowRight') openPicker(true);
+              });
+              el.appendChild(submenu);
+            } else if (projectKind === 'dialog') {
+              var opener = item('Add to Project', function () { openPicker(false); });
+              opener.id = 'add-to-project';
+              el.appendChild(opener);
+            }
+            el.appendChild(item('Archive', function () {
+              closeMenu();
+              var confirm = document.createElement('div');
+              confirm.id = 'confirm-archive';
+              confirm.setAttribute('role', 'alertdialog');
+              confirm.tabIndex = -1;
+              confirm.textContent = 'Archive conversation?';
+              document.body.appendChild(confirm);
+              confirm.focus();
+            }));
+            positioner.appendChild(el);
+            document.body.appendChild(positioner);
+            trigger.setAttribute('aria-expanded', 'true');
+            el.focus();
+          }
+        })();
+        </script>
+        """
     }
 }

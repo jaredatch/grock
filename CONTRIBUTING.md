@@ -21,6 +21,20 @@ Please read [AGENTS.md](AGENTS.md) before you start. It's the brief, and it's sh
 
 CI runs those two on macOS 26 with Xcode 26.6, then builds a sandboxed Release app with `./script/release.sh --local`. Run that one too if you touched entitlements, `project.yml`, or anything in `script/`.
 
+## When grok.com changes
+
+The tests run the page scripts against saved copies of grok.com's markup, so they keep passing after grok.com ships a redesign and the real app breaks. To see the live page, a Debug build takes three launch arguments. Release builds don't have them.
+
+```
+open DerivedData/Build/Products/Debug/Grock.app --args -pageProbe /tmp/probe
+```
+
+- `-pageProbe <folder>` watches that folder for `in.js`, runs it in grok.com as the body of an async function, and writes what it returns to `out.json`. That's a quick way to check a selector or dump part of the DOM.
+- `-freshStore YES` starts signed out with nothing saved, for testing sign-in without losing your own session.
+- `-pageScript <file>` injects a script into every grok.com page.
+
+Whatever you read from the page includes your own chats, so build test fixtures from the structure and make up the text.
+
 ## What we'll say no to
 
 Grock wraps grok.com. It doesn't rebuild it. So, kindly, not these:

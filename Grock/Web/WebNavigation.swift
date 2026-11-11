@@ -355,6 +355,27 @@ enum NavigationPolicy {
         return false
     }
 
+    /// A page that is part of signing in: xAI's account pages, or one of the
+    /// identity providers grok.com's Log in dialog offers.
+    static func isSignInHost(_ host: String?) -> Bool {
+        if isAuthHost(host) { return true }
+        guard let host = normalizedHost(host) else { return false }
+        return signInProviderHosts.contains(host)
+    }
+
+    /// grok.com's Log in dialog sends the window straight to the provider's
+    /// consent page, with grok.com as the place to come back to. That has to
+    /// happen in this WebView or the session lands in the wrong cookie jar.
+    /// An ordinary link to the same host has no such return address.
+    static func isSignInStart(_ url: URL?, from currentURL: URL?) -> Bool {
+        guard let url, url.scheme?.lowercased() == "https",
+              isGrokHost(currentURL?.host), isSignInHost(url.host),
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let target = items.first(where: { $0.name == "redirect_uri" })?.value,
+              let back = URL(string: target), back.scheme?.lowercased() == "https" else { return false }
+        return isGrokHost(back.host)
+    }
+
     /// http(s) that must not replace the grok.com overlay, plus mailto-style schemes.
     /// Dedicated xAI account pages may replace it temporarily. Once there, keep the
     /// allowlisted identity-provider redirect chain in WebKit so its cookies reach Grok.
@@ -364,7 +385,8 @@ enum NavigationPolicy {
         case "http", "https":
             if isGrokHost(url.host) { return false }
             if isAuthEntryHost(url.host) { return false }
-            if isAuthHost(currentURL?.host), isAuthHost(url.host) { return false }
+            if isSignInStart(url, from: currentURL) { return false }
+            if isSignInHost(currentURL?.host), isSignInHost(url.host) { return false }
             return true
         case "mailto", "tel", "sms", "facetime", "facetime-audio":
             return true
@@ -391,6 +413,13 @@ enum NavigationPolicy {
         "accounts.x.ai",
         "auth.x.ai",
         "appleid.apple.com",
+    ]
+
+    /// Providers in grok.com's Log in dialog besides X and Apple. Exact hosts,
+    /// and never popup hosts: links to them in an answer are ordinary links.
+    private static let signInProviderHosts = [
+        "accounts.google.com",
+        "github.com",
     ]
 
     private static let exactAuthHosts = [
@@ -460,6 +489,28 @@ final class WebViewDelegate: NSObject, WKUIDelegate, WKNavigationDelegate, WKDow
         switch type {
         case .microphone, .cameraAndMicrophone, .camera: decisionHandler(.prompt)
         @unknown default: decisionHandler(.deny)
+        }
+    }
+
+    /// grok.com's file inputs: Upload a file in the composer, Upload files in
+    /// Library. WKWebView ignores the click unless the app presents the panel.
+    func webView(
+        _ webView: WKWebView,
+        runOpenPanelWith parameters: WKOpenPanelParameters,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping ([URL]?) -> Void
+    ) {
+        guard isOverlay(webView), frame.isMainFrame, WebViewStore.isGrokPage(frame.request.url),
+              let window = webView.window else {
+            completionHandler(nil)
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = parameters.allowsDirectories
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.beginSheetModal(for: window) { response in
+            completionHandler(response == .OK ? panel.urls : nil)
         }
     }
 

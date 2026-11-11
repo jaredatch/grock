@@ -341,6 +341,67 @@ final class ChatHandoffTests: XCTestCase {
         XCTAssertEqual(state["sends"] as? Int, 0)
     }
 
+    /// grok.com's bubble reads "You" to a screen reader ahead of the text, so
+    /// only the text span matches what was sent.
+    func testNewTurnInGrokMessageBubbleConfirmsAcceptance() async throws {
+        let fixture = try await fixture(script: """
+        send.addEventListener('click', function () {
+          setTimeout(function () {
+            document.getElementById('composer').value = '';
+            var turn = document.createElement('div');
+            turn.setAttribute('role', 'article');
+            turn.setAttribute('data-testid', 'user-message');
+            turn.innerHTML = '<h2>You</h2><span data-bubble-text></span>';
+            turn.querySelector('[data-bubble-text]').textContent = 'Hello Grok';
+            document.body.appendChild(turn);
+          }, 120);
+        });
+        """)
+        defer { fixture.window.close() }
+        let result = try await submit(fixture.webView, acceptWaitMS: 600)
+        XCTAssertEqual(result, "accepted")
+        let state = try await state(fixture.webView)
+        XCTAssertEqual(state["clicks"] as? Int, 1)
+    }
+
+    /// `/imagine` lands on the start page with an Imagine chip in the ordinary
+    /// composer. A fill meant for Imagine waits for that chip, then goes in
+    /// after it.
+    func testImagineFillWaitsForTheCommandChipAndKeepsIt() async throws {
+        let fixture = try await editableFixture(content: "<p><br></p>")
+        defer { fixture.window.close() }
+        let early = try await fill(fixture.webView, text: "A red fox", keepCommand: true)
+        XCTAssertEqual(early, "no-composer")
+        let untouched = try await editableState(fixture.webView)
+        XCTAssertEqual(untouched["text"] as? String, "")
+
+        _ = try await fixture.webView.callAsyncJavaScript(
+            "document.getElementById('composer').innerHTML = chip;",
+            arguments: ["chip": Self.imagineChip], in: nil, contentWorld: .page
+        )
+        let filled = try await fill(fixture.webView, text: "A red fox", keepCommand: true)
+        XCTAssertEqual(filled, "filled")
+        let state = try await editableState(fixture.webView)
+        XCTAssertEqual(state["chip"] as? String, "Imagine")
+        let text = try XCTUnwrap(state["text"] as? String)
+        XCTAssertTrue(text.hasPrefix("Imagine"), text)
+        XCTAssertTrue(text.hasSuffix("A red fox"), text)
+        XCTAssertEqual(state["clicks"] as? Int, 0)
+    }
+
+    func testOrdinaryFillReplacesTheDraftAndAnyCommandChip() async throws {
+        for keepCommand in [nil, false] as [Bool?] {
+            let fixture = try await editableFixture(content: Self.imagineChip + "<p>Old draft</p>")
+            defer { fixture.window.close() }
+            let result = try await fill(fixture.webView, text: "A red fox", keepCommand: keepCommand)
+            XCTAssertEqual(result, "filled")
+            let state = try await editableState(fixture.webView)
+            XCTAssertEqual(state["chip"] as? String, "", "keepCommand=\(String(describing: keepCommand))")
+            XCTAssertEqual(state["text"] as? String, "A red fox", "keepCommand=\(String(describing: keepCommand))")
+            XCTAssertEqual(state["clicks"] as? Int, 0)
+        }
+    }
+
     /// Cancels the remote Retry request before it loads, then supplies another
     /// local document at that destination. This exercises the native retained
     /// package and actual prefill script without contacting grok.com.
@@ -403,6 +464,61 @@ final class ChatHandoffTests: XCTestCase {
             in: nil, contentWorld: .page
         )
         return result as? String ?? "unexpected"
+    }
+
+    private static let imagineChip = """
+    <p><span contenteditable="false"><span data-composer-command data-composer-chip>Imagine</span></span> </p>
+    """
+
+    private func fill(_ webView: WKWebView, text: String, keepCommand: Bool?) async throws -> String {
+        var arguments: [String: Any] = [
+            "promptText": text, "files": [], "operationID": UUID().uuidString,
+            "expectedPath": "/", "attachmentWaitMS": 200
+        ]
+        if let keepCommand { arguments["keepCommand"] = keepCommand }
+        let result = try await webView.callAsyncJavaScript(
+            WebViewStore.fillComposerScript, arguments: arguments, in: nil, contentWorld: .page
+        )
+        return result as? String ?? "unexpected"
+    }
+
+    private func editableState(_ webView: WKWebView) async throws -> [String: Any] {
+        let result = try await webView.evaluateJavaScript("""
+        (function () {
+          var composer = document.getElementById('composer');
+          var chip = composer.querySelector('[data-composer-command]');
+          return {clicks: window.clicks, chip: chip ? chip.textContent : '',
+                  text: composer.textContent.split(String.fromCharCode(160)).join(' ').split(' ').filter(Boolean).join(' ')};
+        })()
+        """)
+        return try XCTUnwrap(result as? [String: Any])
+    }
+
+    /// The composer as grok.com builds it: a rich-text box, not a textarea.
+    private func editableFixture(content: String) async throws -> (webView: WKWebView, window: NSWindow) {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 600, height: 400), configuration: configuration)
+        let window = NSWindow(contentRect: webView.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = webView
+        window.orderFront(nil)
+        let loaded = expectation(description: "Local rich-text composer fixture loaded")
+        let loader = ChatHandoffLoader(loaded: loaded)
+        webView.navigationDelegate = loader
+        webView.loadHTMLString("""
+        <!doctype html><html><body><form data-composer onsubmit="return false">
+          <div id="composer" contenteditable="true" role="textbox" aria-label="Message Grok"
+               style="width:320px;min-height:70px">\(content)</div>
+          <button id="send" type="button" style="min-width:80px;min-height:24px">Send</button>
+        </form><script>
+        window.clicks = 0;
+        document.getElementById('send').addEventListener('click', function () { window.clicks++; });
+        </script></body></html>
+        """, baseURL: URL(string: "https://grok.com/"))
+        await fulfillment(of: [loaded], timeout: 4)
+        if let error = loader.error { throw error }
+        return (webView, window)
     }
 
     private func state(_ webView: WKWebView) async throws -> [String: Any] {

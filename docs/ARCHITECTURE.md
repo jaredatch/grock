@@ -18,7 +18,7 @@ The full write-ups are in [DECISIONS.md](DECISIONS.md). The short version:
 
 **Nothing auto-sends.** `grock://` URLs, the CLI, Finder Services, and OS-handed files all stage a prompt. The user presses Return (DEC-049, DEC-053).
 
-**Offsite links go to the browser.** The main frame stays on grok.com, except for xAI's sign-in flow and the X and Apple hops it redirects through (DEC-032).
+**Offsite links go to the browser.** The main frame stays on grok.com, except for sign-in: xAI's account pages, and the provider page grok.com's Log in window sends you to, recognized by its return address back to grok.com (DEC-032, DEC-072).
 
 **Web content gets a short leash.** Native handlers accept messages only from the main grok.com frame, and the download fallback is GET-only to a short list of asset hosts (DEC-056).
 
@@ -36,7 +36,7 @@ Web bridge            Grock/Web                  WKWebView owner, injected scrip
 Utilities / settings  Grock/Utilities            AppInfo, preferences, download paths, CLI installer
 ```
 
-`WebViewStore` owns the WebView, navigation, composer handoff, and recovery state, plus the page script that notices a reply finishing. `WebNavigation.swift` has `NavigationPolicy`, the navigation delegates, and the guarded download bridge. `GrokChromeScript.swift` adapts grok.com's page chrome (titlebar inset, sidebar, hidden features, promo cards). `QuickChatPayload.swift` is the package Quick Chat hands the page, size limits included. `ReplyMonitor.swift` tracks the unread answer behind the Dock badge. `WebRecovery.swift` draws the native Retry, Open in Browser, and download footer. On the app side, `UpdaterController.swift` wraps Sparkle and `AuthPopupPresenter.swift` hosts sign-in popups.
+`WebViewStore` owns the WebView, navigation, composer handoff, and recovery state, plus the page script that notices a reply finishing. `WebNavigation.swift` has `NavigationPolicy`, the navigation delegates, and the guarded download bridge. `GrokChromeScript.swift` adapts grok.com's page chrome (the controls the titlebar replaces, sidebar, hidden features, promo cards). `QuickChatPayload.swift` is the package Quick Chat hands the page, size limits included. `ReplyMonitor.swift` tracks the unread answer behind the Dock badge. `WebRecovery.swift` draws the native Retry, Open in Browser, and download footer. On the app side, `UpdaterController.swift` wraps Sparkle and `AuthPopupPresenter.swift` hosts sign-in popups.
 
 Injected scripts follow two rules. First, they stay idle when grok.com is idle. The chrome script folds a burst of DOM changes into one animation frame plus one throttled 200 ms pass, and that second pass keeps things current when an occluded window stops getting frames. Second, they never observe attributes we wrote ourselves.
 
@@ -45,7 +45,7 @@ Injected scripts follow two rules. First, they stay idle when grok.com is idle. 
 | Boundary | Rule |
 |----------|------|
 | One WebView | `WebViewStore` owns the WKWebView. Never a second one. Sign-in popups share its configuration and cookie store. |
-| Offsite links | Main frame stays on grok.com, plus xAI's sign-in chain once it starts (X and Apple included). Everything else opens in the default browser. See `NavigationPolicy` in `WebNavigation.swift`. |
+| Offsite links | Main frame stays on grok.com, plus a sign-in chain once it starts: xAI's account pages, or X, Apple, Google, or GitHub when grok.com sends the page there with a `redirect_uri` back to grok.com. Everything else opens in the default browser. See `NavigationPolicy` in `WebNavigation.swift`. |
 | Native handlers | Accept messages only from the main HTTPS grok.com frame. Navigation revokes download authorization. |
 | Sending | No code path sends a message without the user pressing Return or Send. |
 | XcodeGen | Edit `project.yml`, run `xcodegen generate`. Never hand-edit `Grock.xcodeproj`, `Info.plist`, or `Grock.entitlements`; all three are generated. |
@@ -54,7 +54,7 @@ Injected scripts follow two rules. First, they stay idle when grok.com is idle. 
 
 ## Presentation
 
-The overlay is a titled window with a unified toolbar drawn over the WebView (`fullSizeContentView`). Page content scrolls under the bar behind an in-page fade, which means the chrome script has to find grok.com's real scroller and give it a spacer. That walk is the most fragile code in the tree and the reason `GrokChromeScript.swift` is as long as it is: grok.com restyles, we adapt.
+The overlay is a titled window with a unified toolbar drawn over the WebView (`fullSizeContentView`). grok.com keeps a 56px band for its own chrome at the top of every view and fades a thread out beneath it, so the 52pt toolbar sits in that band and nothing has to be pushed down. The chrome script hides the controls the toolbar replaces (grok.com's sidebar toggle and Search, the chat title, Conversation Actions, the right pane toggle) and leaves the layout alone (DEC-071). It matches ids, roles, labels, and `data-` attributes, never class names: grok.com's classes are hashed and change with every build.
 
 Toolbar, left to right: Sidebar toggle, the place or conversation title (a menu of destinations when the sidebar is hidden, a plain label when it's open), then More and Share on a conversation (DEC-055), then New Chat, Private, and Search. While the sidebar is hidden, clicking the title copies the chat URL and Option-click opens it in the browser.
 

@@ -252,7 +252,10 @@ private struct QuickChatItemRow: View {
             }
         }
         .font(.system(size: 15))
-        .foregroundStyle(Color(nsColor: NSColor.labelColor.withAlphaComponent(0.38)))
+        // Hierarchical, not a flattened label colour: the glass recolours
+        // `.secondary` when the card sits over dark content, and it left a
+        // pre-resolved `labelColor.withAlphaComponent` as near-black.
+        .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
     }

@@ -315,6 +315,52 @@ final class CorePolicyTests: XCTestCase {
                 from: URL(string: "https://accounts.x.ai/sign-in")
             )
         )
+        // grok.com's Log in dialog goes straight to the provider, naming
+        // grok.com as the way back. Only that shape stays in the WebView.
+        let grok = URL(string: "https://grok.com/")
+        let callback = "redirect_uri=https%3A%2F%2Fgrok.com%2Fapi%2Fauth%2Foauth%2Fcallback"
+        for start in [
+            "https://x.com/i/oauth2/authorize?response_type=code&\(callback)&scope=users.read",
+            "https://appleid.apple.com/auth/authorize?\(callback)",
+            "https://accounts.google.com/o/oauth2/v2/auth?\(callback)",
+            "https://github.com/login/oauth/authorize?\(callback)",
+        ] {
+            XCTAssertFalse(NavigationPolicy.shouldOpenInBrowser(URL(string: start), from: grok), start)
+        }
+        for link in [
+            "https://x.com/i/oauth2/authorize",
+            "https://x.com/someone/status/1",
+            "https://github.com/example/repo",
+            "https://github.com/login/oauth/authorize?redirect_uri=https%3A%2F%2Fexample.com%2Fcallback",
+            "https://x.com/i/oauth2/authorize?redirect_uri=https%3A%2F%2Fgrok.com.evil.com%2Fcallback",
+            "https://x.com/i/oauth2/authorize?redirect_uri=http%3A%2F%2Fgrok.com%2Fcallback",
+            "https://example.com/authorize?\(callback)",
+        ] {
+            XCTAssertTrue(NavigationPolicy.shouldOpenInBrowser(URL(string: link), from: grok), link)
+        }
+        // The same start from anywhere else is not grok.com signing in.
+        XCTAssertTrue(
+            NavigationPolicy.shouldOpenInBrowser(
+                URL(string: "https://github.com/login/oauth/authorize?\(callback)"),
+                from: URL(string: "https://example.com/")
+            )
+        )
+        // Once on the provider, its own pages (password, two-factor) stay too.
+        XCTAssertFalse(
+            NavigationPolicy.shouldOpenInBrowser(
+                URL(string: "https://github.com/sessions/two-factor"),
+                from: URL(string: "https://github.com/login")
+            )
+        )
+        XCTAssertFalse(
+            NavigationPolicy.shouldOpenInBrowser(
+                URL(string: "https://accounts.google.com/signin/v2/challenge"),
+                from: URL(string: "https://accounts.google.com/o/oauth2/v2/auth")
+            )
+        )
+        // Links to those hosts never become a sign-in popup.
+        XCTAssertFalse(NavigationPolicy.shouldPresentAuthPopup(URL(string: "https://github.com/example/repo")))
+        XCTAssertFalse(NavigationPolicy.shouldPresentAuthPopup(URL(string: "https://accounts.google.com/")))
         XCTAssertTrue(NavigationPolicy.shouldOpenInBrowser(URL(string: "mailto:hi@example.com")))
         XCTAssertFalse(NavigationPolicy.shouldOpenInBrowser(URL(string: "about:blank")))
         XCTAssertFalse(NavigationPolicy.shouldOpenInBrowser(URL(string: "blob:https://grok.com/abc")))

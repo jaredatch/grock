@@ -128,8 +128,16 @@ final class WebViewStore {
     }
 
     private init() {
+        Self.keepWebInspectorDetached()
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+        #if DEBUG
+        // `-freshStore YES` runs signed out with nothing saved, to check the
+        // logged-out page and sign-in without clearing the real session.
+        if UserDefaults.standard.bool(forKey: "freshStore") {
+            config.websiteDataStore = .nonPersistent()
+        }
+        #endif
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         config.userContentController.addScriptMessageHandler(
@@ -162,6 +170,13 @@ final class WebViewStore {
         config.userContentController.addUserScript(
             WKUserScript(source: Self.replyObserverScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
+        #if DEBUG
+        if let script = Self.debugPageScript() {
+            config.userContentController.addUserScript(
+                WKUserScript(source: script, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            )
+        }
+        #endif
 
         webViewDelegate.bridge = downloadBridge
 
@@ -191,10 +206,33 @@ final class WebViewStore {
         applyChrome()
         setWebViewCovered(true)
         loadHome()
+        #if DEBUG
+        startDebugPageProbe()
+        #endif
     }
 
     func loadHome() {
         webView.load(URLRequest(url: Self.homeURL))
+    }
+
+    /// Sign-in pages get a shorter WebView (they start below the titlebar).
+    /// A page that loads across that change keeps the old height as `svh` and
+    /// `lvh` until the window is next resized. grok.com sizes its shell in
+    /// `svh`, so coming back from sign-in left a blank band along the bottom.
+    /// Once the page has loaded, make WebKit measure the frame it has now.
+    private var viewportUnitsStale = false
+
+    func markViewportUnitsStale() {
+        viewportUnitsStale = true
+    }
+
+    private func refreshViewportUnitsIfStale() {
+        guard viewportUnitsStale else { return }
+        viewportUnitsStale = false
+        // Setting the same insets again is ignored, so change them and put them back.
+        let nudge = NSEdgeInsets(top: 0, left: 0, bottom: 1, right: 0)
+        webView.setMinimumViewportInset(nudge, maximumViewportInset: nudge)
+        webView.setMinimumViewportInset(NSEdgeInsetsZero, maximumViewportInset: NSEdgeInsetsZero)
     }
 
     /// Fresh conversation: click grok.com's New Chat when the SPA is warm.
@@ -261,6 +299,7 @@ final class WebViewStore {
 
     func handleNavigationFinished() {
         recoveryState = nil
+        refreshViewportUnitsIfStale()
         applyChrome()
         if pendingPayload != nil {
             waitingForComposer = true
@@ -465,7 +504,8 @@ final class WebViewStore {
         let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let intended = (intendedComposerPath ?? recoveryComposerPath)?
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        if Self.isGrokPage(url), path == intended { return }
+        if Self.isGrokPage(url), let intended,
+           path == intended || path == Self.landingPath(intended) { return }
         finishPayload(cancelComposerOperations())
         pendingFocusInput = false
         pendingEnterVoice = false
@@ -640,9 +680,12 @@ final class WebViewStore {
         return url.path.isEmpty || url.path == "/"
     }
 
-    static func isImagineHome(_ url: URL?) -> Bool {
-        guard isGrokPage(url), let url else { return false }
-        return url.path == "/imagine" || url.path == "/imagine/"
+    /// Where a requested composer path ends up, without slashes. grok.com
+    /// folded Imagine into the start page: `/imagine` lands on `/` with an
+    /// Imagine chip already in the composer.
+    static func landingPath(_ path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return trimmed == "imagine" ? "" : trimmed
     }
 
     func reload() {
@@ -742,7 +785,10 @@ final class WebViewStore {
     (function () {
       var tries = 0;
       function attempt() {
-        var btn = document.querySelector('button[aria-label^="Enter voice mode"]');
+        var btn = document.querySelector(
+          'form[data-composer] button[data-composer-action="voice"],'
+          + 'button[aria-label="Voice mode"], button[aria-label^="Enter voice mode"]'
+        );
         if (btn) {
           btn.click();
           return;
@@ -754,9 +800,10 @@ final class WebViewStore {
     })();
     """
 
-    /// Click grok.com's New Chat, or report that the start page is already blank.
-    /// Do not open Search: Create New Chat lives in that modal and flashes it.
-    /// Order: already-open Create New Chat, header icon, Chat row, project New Chat.
+    /// Click grok.com's New chat, or report that the start page is already blank.
+    /// Do not open Search to get there: it flashes the command menu.
+    /// Order: the sidebar's New chat row, then any nav control with that exact
+    /// label. "New chat in <project>" is a different button and never matches.
     static let freshSessionScript = """
     (function () {
       function norm(value) {
@@ -770,93 +817,40 @@ final class WebViewStore {
         var path = location.pathname;
         return path === '/' || path === '';
       }
-      function pathOf(href) {
-        try { return new URL(href, location.href).pathname; } catch (err) { return href || ''; }
+      // A sidebar row's text also holds its keyboard shortcut. The label is
+      // in its own span.
+      function labelOf(el) {
+        var span = el.querySelector('[data-sidebar-item-label]');
+        return norm(el.getAttribute('aria-label') || el.getAttribute('title')
+          || (span ? span.textContent : el.textContent)).toLowerCase();
       }
-      function labeled(el, name) {
-        var aria = norm(el.getAttribute('aria-label'));
-        var title = norm(el.getAttribute('title'));
-        var text = norm(el.textContent);
-        return aria === name || title === name || text === name
-          || aria.indexOf(name) === 0 || title.indexOf(name) === 0;
+      function isNewChat(el) {
+        var label = labelOf(el);
+        return label === 'new chat' || label === 'create new chat';
       }
       if (!hostOk()) return 'missing';
-      // Path `/` is already a new chat. Do not click New Chat: grok.com
-      // remounts, and <a href="/"> often does a second full navigation.
+      // Path `/` is already a new chat. Do not click New chat: grok.com
+      // remounts the composer for nothing.
       if (startPath()) return 'already-fresh';
       window.__grockPreviousPath = location.pathname;
       window.__grockPreviousComposer = document.querySelector('textarea, [contenteditable], [role="textbox"]');
 
-      function navNodes() {
-        return document.querySelectorAll(
-          '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button, header a, header button'
-        );
-      }
-      function findCreateNewChat() {
-        var roots = document.querySelectorAll('[role="dialog"], [role="search"], [cmdk-dialog], [cmdk-root]');
-        for (var r = 0; r < roots.length; r++) {
-          var nodes = roots[r].querySelectorAll('a, button, [role="option"], [cmdk-item], [role="button"]');
-          for (var i = 0; i < nodes.length; i++) {
-            if (labeled(nodes[i], 'Create New Chat')) return nodes[i];
-          }
+      var rows = document.querySelectorAll('#app-sidebar button, #app-sidebar a');
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].querySelector('[data-sidebar-item-label]') && isNewChat(rows[i])) {
+          rows[i].click();
+          return 'clicked';
         }
-        return null;
       }
-      function findHeaderNewChat() {
-        var header = document.querySelector('[data-sidebar="header"]');
-        if (!header) return null;
-        var nodes = header.querySelectorAll('a, button, [role="button"]');
-        for (var i = 0; i < nodes.length; i++) {
-          if (labeled(nodes[i], 'New Chat') || labeled(nodes[i], 'Create New Chat')) return nodes[i];
+      var nodes = document.querySelectorAll(
+        '#app-sidebar a, #app-sidebar button, nav a, nav button, aside a, aside button, header a, header button'
+      );
+      for (var j = 0; j < nodes.length; j++) {
+        if (nodes[j].closest('[aria-label="Right pane"]')) continue;
+        if (isNewChat(nodes[j])) {
+          nodes[j].click();
+          return 'clicked';
         }
-        return null;
-      }
-      function findProjectNewChat() {
-        var nodes = navNodes();
-        for (var i = 0; i < nodes.length; i++) {
-          if (labeled(nodes[i], 'New Chat')) return nodes[i];
-        }
-        return null;
-      }
-      function findChatHome() {
-        var nodes = navNodes();
-        var slash = null;
-        for (var i = 0; i < nodes.length; i++) {
-          var el = nodes[i];
-          var aria = norm(el.getAttribute('aria-label'));
-          var title = norm(el.getAttribute('title'));
-          var text = norm(el.textContent);
-          if (aria === 'Chat' || title === 'Chat' || text === 'Chat') return el;
-          var href = el.getAttribute('href');
-          if (!href || slash) continue;
-          if (pathOf(href) === '/') {
-            var label = (aria || title).toLowerCase();
-            if (label === 'grok' || label === 'home' || label === 'logo') continue;
-            slash = el;
-          }
-        }
-        return slash;
-      }
-
-      var create = findCreateNewChat();
-      if (create) {
-        create.click();
-        return 'clicked';
-      }
-      var header = findHeaderNewChat();
-      if (header) {
-        header.click();
-        return 'clicked';
-      }
-      var chat = findChatHome();
-      if (chat) {
-        chat.click();
-        return 'clicked';
-      }
-      var project = findProjectNewChat();
-      if (project) {
-        project.click();
-        return 'clicked';
       }
       return 'missing';
     })();
@@ -962,7 +956,12 @@ final class WebViewStore {
       }
       return null;
     }
-    function grockSetText(el, text) {
+    // An Imagine composer starts with a command chip. Selecting everything
+    // would replace it, so that text goes in after the chip instead.
+    function grockHasCommand(el) {
+      return !!(el && el.querySelector && el.querySelector('[data-composer-command], [data-composer-chip]'));
+    }
+    function grockSetText(el, text, keepCommand) {
       if (!el || !text) return;
       try { el.focus(); } catch (err) {}
       var tag = String(el.tagName || '').toUpperCase();
@@ -983,7 +982,18 @@ final class WebViewStore {
         } catch (err) {}
         return;
       }
-      try { document.execCommand('selectAll', false, null); } catch (err) {}
+      if (keepCommand && grockHasCommand(el)) {
+        try {
+          var range = document.createRange();
+          range.selectNodeContents(el);
+          range.collapse(false);
+          var selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        } catch (err) {}
+      } else {
+        try { document.execCommand('selectAll', false, null); } catch (err) {}
+      }
       try { document.execCommand('insertText', false, text); } catch (err) {}
       if (!(el.innerText || el.textContent || '').trim()) {
         el.textContent = text;
@@ -1140,12 +1150,15 @@ final class WebViewStore {
     if (window.__grockPreviousComposer === composer && window.__grockPreviousPath !== location.pathname) {
       return 'no-composer';
     }
+    // Imagine is the same composer once grok.com has put its chip in.
+    var wantsCommand = typeof keepCommand !== 'undefined' && !!keepCommand;
+    if (wantsCommand && !grockHasCommand(composer)) return 'no-composer';
     if (grockCancelled() || !grockOnRoute()) return 'cancelled';
     var attachmentBaseline = (files || []).map(grockAttachmentEvidence);
     var attached;
     try { attached = grockAttach(files); } catch (err) { return 'attachment-failed'; }
     if (attached === 'missing' && files && files.length) return 'attachment-failed';
-    if (String(promptText || '').length) grockSetText(composer, promptText);
+    if (String(promptText || '').length) grockSetText(composer, promptText, wantsCommand);
     else if (grockIsStockAttachPrompt(grockComposerText(composer))) grockClearText(composer);
     var expectedDraft = grockComposerText(composer);
     var outcome = await grockWaitForAttachments(files, attachmentBaseline, attachmentWaitMS, function () {
@@ -1197,8 +1210,8 @@ final class WebViewStore {
     function grockNormalize(text) { return String(text || '').replace(/\\s+/g, ' ').trim(); }
     function grockMatchingTurns() {
       return Array.from(document.querySelectorAll(
-        '[data-message-author-role="user"], [data-role="user"], [data-testid="user-message"], '
-        + '[data-author="user"], .message-bubble'
+        '[data-testid="user-message"] [data-bubble-text], [data-testid="user-message"], '
+        + '[data-message-author-role="user"], [data-role="user"], [data-author="user"], .message-bubble'
       )).filter(function (el) {
         return !el.closest('form, [contenteditable], [role="textbox"]')
           && grockNormalize(el.innerText || el.textContent) === grockNormalize(promptText);
@@ -1269,6 +1282,14 @@ final class WebViewStore {
         applyWebInspector()
     }
 
+    /// The inspector opens in its own window. Docked, it resizes the WebView
+    /// from under our layout and comes up blank. WebKit remembers where it was
+    /// last put in this default and reads it when the WebView is created, so
+    /// this runs first on every launch.
+    private static func keepWebInspectorDetached() {
+        UserDefaults.standard.set(false, forKey: "__WebInspectorPageGroupLevel1__.WebKit2InspectorStartsAttached")
+    }
+
     /// Safari Web Inspector + right-click Inspect Element. Not Chromium DevTools.
     func applyWebInspector(to target: WKWebView? = nil) {
         let webView = target ?? self.webView
@@ -1337,9 +1358,9 @@ final class WebViewStore {
         }
     }
 
-    /// Click grok.com's hidden conversation action (`share`, `panel`, `pin`, `project`, `delete`).
+    /// Click grok.com's hidden conversation action (`share`, `panel`, `pin`, `project`, `archive`).
     func clickSessionAction(_ name: String) {
-        let allowed: Set<String> = ["share", "panel", "pin", "project", "delete"]
+        let allowed: Set<String> = ["share", "panel", "pin", "project", "archive"]
         guard allowed.contains(name) else { return }
         webView.callAsyncJavaScript(
             "return await window.__grockChrome.clickSession(action);",
@@ -1392,15 +1413,10 @@ final class WebViewStore {
         webView.evaluateJavaScript(Self.openPluginsScript, completionHandler: nil)
     }
 
-    /// Title menu Projects clicks grok.com's All projects control. Their
-    /// hover URL is wrong (`/library?tab=imagine`); do not guess it.
+    /// Title menu Projects. grok.com's Projects page is a plain route now;
+    /// the sidebar has no All projects control to click.
     func openAllProjects() {
-        webView.evaluateJavaScript(Self.openAllProjectsScript) { [weak self] result, _ in
-            Task { @MainActor in
-                guard let self, (result as? String) == "missing" else { return }
-                self.openGrokPath("/project")
-            }
-        }
+        openGrokPath("/project")
     }
 
     /// Place destinations with a real grok.com path (Imagine, Projects, …).
@@ -1467,10 +1483,13 @@ final class WebViewStore {
             presentRecovery(.contextNotAdded)
             return
         }
+        let landing = Self.landingPath(fill.path)
+        // A fill meant for Imagine waits for that chip, so it can never land
+        // in an ordinary chat that happens to be on the same path.
+        let wantsImagine = landing != fill.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard !webView.isLoading, !freshSessionInProgress,
               Self.isGrokPage(webView.url),
-              (webView.url?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? "")
-                == fill.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) else {
+              (webView.url?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? "") == landing else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 guard let self, self.pendingComposerFill?.generation == fill.generation else { return }
                 self.attemptPendingComposerFill(tries: tries + 1)
@@ -1487,7 +1506,8 @@ final class WebViewStore {
         webView.callAsyncJavaScript(
             Self.fillComposerScript,
             arguments: ["promptText": fill.text, "files": files,
-                        "operationID": UUID().uuidString, "expectedPath": fill.path,
+                        "operationID": UUID().uuidString, "expectedPath": "/\(landing)",
+                        "keepCommand": wantsImagine,
                         "attachmentWaitMS": attachmentWaitMilliseconds],
             in: nil, in: .page
         ) { [weak self] result in
@@ -1510,7 +1530,7 @@ final class WebViewStore {
                 // A route change belongs to a newer user action. Failures on
                 // the intended page retain bytes and offer an explicit Retry.
                 let path = self.webView.url?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                guard path == fill.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) else {
+                guard path == landing else {
                     self.activeComposerFill = nil
                     return
                 }
@@ -1524,47 +1544,17 @@ final class WebViewStore {
         }
     }
 
-    /// grok.com's Imagine "New Generation". Same as New Chat on `/`: if we
-    /// are already on Imagine home, do not click or assign (that remounts
-    /// and WKWebView often full-loads). Click only when leaving a subpage.
+    /// App menu New Generation: a fresh composer in Imagine mode.
     func startNewGeneration() {
-        finishPayload(cancelComposerOperations())
-        intendedComposerPath = "/imagine"
-        guard let url = webView.url, Self.isGrokPage(url) else {
-            openGrokPath("/imagine")
-            return
-        }
-        if Self.isImagineHome(url) {
-            focusInput()
-            return
-        }
-        let generation = freshSessionGeneration
-        webView.evaluateJavaScript(Self.newGenerationScript) { [weak self] result, _ in
-            Task { @MainActor in
-                guard let self, generation == self.freshSessionGeneration else { return }
-                let outcome = result as? String ?? "missing"
-                guard outcome == "missing" else { return }
-                if Self.isImagineHome(self.webView.url) { return }
-                self.openGrokPath("/imagine")
-            }
-        }
+        openImagineHome()
+        pendingFocusInput = true
     }
 
+    /// grok.com has no Imagine page or control to click now. Its `/imagine`
+    /// link is the way in, and a load starts before any queued fill can run.
     private func openImagineHome() {
         finishPayload(cancelComposerOperations())
-        intendedComposerPath = "/imagine"
-        guard let url = webView.url, Self.isGrokPage(url) else {
-            openGrokPath("/imagine")
-            return
-        }
-        let generation = freshSessionGeneration
-        webView.evaluateJavaScript(Self.clickImagineHomeScript) { [weak self] result, _ in
-            Task { @MainActor in
-                guard let self, generation == self.freshSessionGeneration,
-                      (result as? String) == "missing" else { return }
-                self.openGrokPath("/imagine")
-            }
-        }
+        openGrokPath("/imagine")
     }
 
     /// grok.com's conversation history page (same destination as the sidebar item).
@@ -1572,22 +1562,14 @@ final class WebViewStore {
         openGrokPath("/history")
     }
 
-    /// Click a grok.com sidebar control even if the rail is hidden. `href` is
-    /// a SPA fallback when the node is gone.
-    func openSidebarItem(label: String, href: String?) {
-        webView.evaluateJavaScript(
-            Self.clickSidebarItemScript(label: label, href: href),
-            completionHandler: nil
-        )
-    }
-
-    /// grok.com's Private control. If already private, start a fresh thread instead.
+    /// grok.com's Private toggle.
     func startPrivateChat() {
         webView.evaluateJavaScript(Self.privateChatScript, completionHandler: nil)
     }
 
-    static let toggleSearchScript = """
-    (function () {
+    /// grok.com's Search is a command menu opened by a button it draws beside
+    /// the traffic lights. The titlebar hides that button and clicks it.
+    private static let searchHelperScript = """
       function norm(value) {
         return String(value || '').replace(/\\s+/g, ' ').trim();
       }
@@ -1600,33 +1582,35 @@ final class WebViewStore {
       }
       function findSearch() {
         var nodes = document.querySelectorAll(
-          '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button, header a, header button'
+          '[data-leading-chrome] button, #app-sidebar a, #app-sidebar button,'
+          + ' nav a, nav button, aside a, aside button, header a, header button'
         );
         for (var i = 0; i < nodes.length; i++) {
           var el = nodes[i];
+          if (el.closest('[aria-label="Right pane"]')) continue;
           var aria = norm(el.getAttribute('aria-label'));
           var title = norm(el.getAttribute('title'));
           var text = norm(el.textContent);
           if (aria === 'Search' || title === 'Search' || text === 'Search') return el;
-          if (aria.indexOf('Search') === 0 || title.indexOf('Search') === 0) return el;
         }
         return null;
       }
+      // Settings and Library have search fields of their own. The command
+      // menu is the dialog built around a combobox.
       function searchDialog() {
         var nodes = document.querySelectorAll('[role="dialog"], [role="search"], [cmdk-dialog]');
         for (var i = 0; i < nodes.length; i++) {
           if (!visible(nodes[i])) continue;
-          if (nodes[i].querySelector('input, [role="searchbox"], [cmdk-input]')) return nodes[i];
-          var text = (nodes[i].textContent || '').toLowerCase();
-          if (text.indexOf('search') !== -1) return nodes[i];
-        }
-        var active = document.activeElement;
-        if (active && (active.tagName === 'INPUT' || active.getAttribute('role') === 'combobox')) {
-          var wrap = active.closest('[role="dialog"]');
-          if (wrap && visible(wrap)) return wrap;
+          if (nodes[i].matches('[data-analytics-name="command_menu"]')) return nodes[i];
+          if (nodes[i].querySelector('[role="combobox"], [role="searchbox"], [cmdk-input]')) return nodes[i];
         }
         return null;
       }
+    """
+
+    static let toggleSearchScript = """
+    (function () {
+    \(searchHelperScript)
       var open = searchDialog();
       if (open) {
         var close = open.querySelector(
@@ -1649,77 +1633,17 @@ final class WebViewStore {
 
     static let openSearchScript = """
     (function () {
-      function norm(value) {
-        return String(value || '').replace(/\\s+/g, ' ').trim();
-      }
-      function visible(el) {
-        if (!el) return false;
-        var box = el.getBoundingClientRect();
-        if (box.width < 8 || box.height < 8) return false;
-        var style = window.getComputedStyle(el);
-        return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-      }
-      function searchDialog() {
-        var nodes = document.querySelectorAll('[role="dialog"], [role="search"], [cmdk-dialog]');
-        for (var i = 0; i < nodes.length; i++) {
-          if (!visible(nodes[i])) continue;
-          if (nodes[i].querySelector('input, [role="searchbox"], [cmdk-input]')) return nodes[i];
-        }
-        return null;
-      }
+    \(searchHelperScript)
       if (searchDialog()) return 'already-open';
-      var nodes = document.querySelectorAll(
-        '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button, header a, header button'
-      );
-      for (var i = 0; i < nodes.length; i++) {
-        var el = nodes[i];
-        var aria = norm(el.getAttribute('aria-label'));
-        var title = norm(el.getAttribute('title'));
-        var text = norm(el.textContent);
-        if (aria === 'Search' || title === 'Search' || text === 'Search') {
-          el.click();
-          return 'opened';
-        }
-        if (aria.indexOf('Search') === 0 || title.indexOf('Search') === 0) {
-          el.click();
-          return 'opened';
-        }
-      }
-      return 'missing';
+      var btn = findSearch();
+      if (!btn) return 'missing';
+      btn.click();
+      return 'opened';
     })();
     """
 
-    /// Click grok.com's All projects control (hover icon on the Projects header).
-    static let openAllProjectsScript = """
-    (function () {
-      function norm(value) {
-        return String(value || '').replace(/\\s+/g, ' ').trim();
-      }
-      function labeled(el, name) {
-        var aria = norm(el.getAttribute('aria-label'));
-        var title = norm(el.getAttribute('title'));
-        var text = norm(el.textContent);
-        var lowName = name.toLowerCase();
-        return aria === name || title === name || text === name
-          || aria.toLowerCase() === lowName || title.toLowerCase() === lowName
-          || aria.indexOf(name) === 0 || title.indexOf(name) === 0;
-      }
-      var names = ['All projects', 'All Projects'];
-      var nodes = document.querySelectorAll(
-        '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button, [title], [aria-label]'
-      );
-      for (var i = 0; i < nodes.length; i++) {
-        for (var n = 0; n < names.length; n++) {
-          if (!labeled(nodes[i], names[n])) continue;
-          nodes[i].click();
-          return 'clicked';
-        }
-      }
-      return 'missing';
-    })();
-    """
-
-    /// Click grok.com's Plugins control (connectors / skills modal).
+    /// Plugins are the Connect Apps and Skills pages of grok.com's Settings.
+    /// The sidebar's Connect apps button opens Settings there.
     static let openPluginsScript = """
     (function () {
       function norm(value) {
@@ -1736,219 +1660,52 @@ final class WebViewStore {
         var nodes = document.querySelectorAll('[role="dialog"]');
         for (var i = 0; i < nodes.length; i++) {
           if (!visible(nodes[i])) continue;
-          var text = String(nodes[i].textContent || '');
-          if (text.indexOf('Connectors') === -1) continue;
-          if (text.indexOf('Skills') !== -1 || text.indexOf('New Connector') !== -1) return nodes[i];
+          var text = String(nodes[i].textContent || '').toLowerCase();
+          if (text.indexOf('connect apps') !== -1 && text.indexOf('skills') !== -1) return nodes[i];
         }
         return null;
       }
       if (pluginsDialog()) return 'already-open';
+      var names = ['connect apps', 'plugins'];
       var nodes = document.querySelectorAll(
-        '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button'
+        '#app-sidebar a, #app-sidebar button, nav a, nav button, aside a, aside button'
       );
       for (var i = 0; i < nodes.length; i++) {
         var el = nodes[i];
-        var aria = norm(el.getAttribute('aria-label'));
-        var title = norm(el.getAttribute('title'));
-        var text = norm(el.textContent);
-        if (aria === 'Plugins' || title === 'Plugins' || text === 'Plugins') {
-          el.click();
-          return 'opened';
-        }
-        if (aria.indexOf('Plugins') === 0 || title.indexOf('Plugins') === 0) {
-          el.click();
-          return 'opened';
-        }
+        if (el.closest('[aria-label="Right pane"]')) continue;
+        var span = el.querySelector('[data-sidebar-item-label]');
+        var label = norm(el.getAttribute('aria-label') || el.getAttribute('title')
+          || (span ? span.textContent : el.textContent)).toLowerCase();
+        if (names.indexOf(label) === -1) continue;
+        el.click();
+        return 'opened';
       }
       return 'missing';
     })();
     """
 
-    /// Click grok.com's Imagine New Generation. Same-URL assign blanks WKWebView.
-    static let newGenerationScript = """
-    (function () {
-      function norm(value) {
-        return String(value || '').replace(/\\s+/g, ' ').trim();
-      }
-      function imagineHome() {
-        var p = location.pathname;
-        return p === '/imagine' || p === '/imagine/';
-      }
-      // Already on Imagine home. Do not click New Generation: grok.com
-      // remounts, and <a href="/imagine"> often does a full navigation.
-      if (imagineHome()) return 'already-home';
-      window.__grockPreviousPath = location.pathname;
-      window.__grockPreviousComposer = document.querySelector('textarea, [contenteditable], [role="textbox"]');
-      var nodes = document.querySelectorAll(
-        '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button, header a, header button, a, button, [role="button"]'
-      );
-      function findNewGeneration() {
-        for (var i = 0; i < nodes.length; i++) {
-          var el = nodes[i];
-          var aria = norm(el.getAttribute('aria-label'));
-          var title = norm(el.getAttribute('title'));
-          var text = norm(el.textContent);
-          if (aria === 'New Generation' || title === 'New Generation' || text === 'New Generation') {
-            return el;
-          }
-          if (aria.indexOf('New Generation') === 0 || title.indexOf('New Generation') === 0) {
-            return el;
-          }
-        }
-        return null;
-      }
-      var btn = findNewGeneration();
-      if (btn) {
-        btn.click();
-        return 'clicked';
-      }
-      try {
-        location.assign(new URL('/imagine', location.origin).href);
-        return 'navigated';
-      } catch (err) {}
-      return 'missing';
-    })();
-    """
-
-    /// Click grok.com's Imagine control. Exact `/imagine`, not `/imagine/saved`.
-    static let clickImagineHomeScript = """
-    (function () {
-      function norm(value) {
-        return String(value || '').replace(/\\s+/g, ' ').trim();
-      }
-      function pathOf(href) {
-        try { return new URL(href, location.href).pathname; } catch (err) { return href || ''; }
-      }
-      function isImagineHome(path) {
-        return path === '/imagine' || path === '/imagine/';
-      }
-      if (isImagineHome(location.pathname)) return 'already-home';
-      window.__grockPreviousPath = location.pathname;
-      window.__grockPreviousComposer = document.querySelector('textarea, [contenteditable], [role="textbox"]');
-      var nodes = document.querySelectorAll(
-        '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button, header a, header button'
-      );
-      var hrefFallback = null;
-      for (var i = 0; i < nodes.length; i++) {
-        var el = nodes[i];
-        var aria = norm(el.getAttribute('aria-label'));
-        var title = norm(el.getAttribute('title'));
-        var text = norm(el.textContent);
-        if (aria === 'Imagine' || title === 'Imagine' || text === 'Imagine') {
-          el.click();
-          return 'clicked';
-        }
-        var href = el.getAttribute('href');
-        if (!href || hrefFallback) continue;
-        if (isImagineHome(pathOf(href))) hrefFallback = el;
-      }
-      if (hrefFallback) {
-        hrefFallback.click();
-        return 'clicked';
-      }
-      try {
-        location.assign(new URL('/imagine', location.origin).href);
-        return 'navigated';
-      } catch (err) {}
-      return 'missing';
-    })();
-    """
-
-    static func clickSidebarItemScript(label: String, href: String?) -> String {
-        let safeLabel = label
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-        let safeHref: String
-        if let href {
-            let escaped = href
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "'", with: "\\'")
-            safeHref = "'\(escaped)'"
-        } else {
-            safeHref = "null"
-        }
-        return """
-        (function () {
-          var name = '\(safeLabel)';
-          var href = \(safeHref);
-          function norm(value) {
-            return String(value || '').replace(/\\s+/g, ' ').trim();
-          }
-          var nodes = document.querySelectorAll(
-            '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button'
-          );
-          for (var i = 0; i < nodes.length; i++) {
-            var el = nodes[i];
-            var aria = norm(el.getAttribute('aria-label'));
-            var title = norm(el.getAttribute('title'));
-            var text = norm(el.textContent);
-            var match = aria === name || title === name || text === name
-              || aria.indexOf(name) === 0 || title.indexOf(name) === 0;
-            if (!match && href) {
-              var link = el.getAttribute('href') || '';
-              if (link === href || link.indexOf(href + '/') === 0) match = true;
-            }
-            if (!match) continue;
-            el.click();
-            return 'clicked';
-          }
-          if (href) {
-            try {
-              location.assign(new URL(href, location.origin).href);
-              return 'navigated';
-            } catch (err) {}
-          }
-          return 'missing';
-        })();
-        """
-    }
-
+    /// Private is a toggle in the band over the main column. Its label reads
+    /// "Switch to Private Chat" or "Exit Private Chat"; the visible text is
+    /// "Private". Leaving is the same click, or grok.com's New chat.
     static let privateChatScript = """
     (function () {
       function norm(value) {
         return String(value || '').replace(/\\s+/g, ' ').trim();
       }
-      function findPrivate() {
-        var nodes = document.querySelectorAll('a, button');
-        for (var i = 0; i < nodes.length; i++) {
-          var el = nodes[i];
-          var aria = norm(el.getAttribute('aria-label'));
-          var title = norm(el.getAttribute('title'));
-          var text = norm(el.textContent);
-          if (aria === 'Private' || title === 'Private' || text === 'Private') return el;
-          if (aria.indexOf('Private') === 0 || title.indexOf('Private') === 0) return el;
+      var scope = document.querySelector('#grok-content-area header') ? '#grok-content-area header ' : '';
+      var nodes = document.querySelectorAll(scope + 'a, ' + scope + 'button');
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        var aria = norm(el.getAttribute('aria-label'));
+        var title = norm(el.getAttribute('title'));
+        var text = norm(el.textContent);
+        if (aria === 'Private' || title === 'Private' || text === 'Private'
+            || /\\bprivate chat\\b/i.test(aria)) {
+          el.click();
+          return 'clicked';
         }
-        return null;
       }
-      function isOn(el) {
-        if (!el) return false;
-        var pressed = (el.getAttribute('aria-pressed') || '').toLowerCase();
-        var state = (el.getAttribute('data-state') || '').toLowerCase();
-        var aria = (el.getAttribute('aria-label') || '').toLowerCase();
-        if (pressed === 'true' || state === 'on' || state === 'open') return true;
-        if (aria.indexOf('exit') !== -1 || aria.indexOf('disable') !== -1) return true;
-        var path = (location.pathname || '').toLowerCase();
-        if (path.indexOf('/private') === 0) return true;
-        return false;
-      }
-      var btn = findPrivate();
-      if (btn && isOn(btn)) {
-        var nodes = document.querySelectorAll(
-          '[data-sidebar] a, [data-sidebar] button, nav a, nav button, aside a, aside button, header a, header button'
-        );
-        for (var i = 0; i < nodes.length; i++) {
-          var label = norm(nodes[i].getAttribute('aria-label') || nodes[i].textContent);
-          if (label === 'New Chat' || label.indexOf('New Chat') === 0
-              || label === 'Create New Chat' || label.indexOf('Create New Chat') === 0) {
-            nodes[i].click();
-            return 'new-private';
-          }
-        }
-        return 'already-private';
-      }
-      if (!btn) return 'missing';
-      btn.click();
-      return 'clicked';
+      return 'missing';
     })();
     """
 
@@ -1968,15 +1725,6 @@ final class WebViewStore {
       function hostOk() {
         var host = String(location.hostname || '').toLowerCase();
         return host === 'grok.com' || host.slice(-9) === '.grok.com';
-      }
-      function pathOf(el) {
-        var href = el.getAttribute('href');
-        if (!href) return '';
-        try { return new URL(href, location.href).pathname; } catch (err) { return href; }
-      }
-      function conversationKey(path) {
-        var match = String(path || '').match(/\\/c\\/([^/]+)/);
-        return match ? match[1] : '';
       }
       function isPlaceName(text) {
         var low = String(text || '').toLowerCase();
@@ -2000,7 +1748,7 @@ final class WebViewStore {
         if (aria) return aria;
         var titled = usable(norm(el.getAttribute('title')));
         if (titled) return titled;
-        var span = el.querySelector('span.truncate, span.whitespace-nowrap');
+        var span = el.matches('[data-sidebar-item-label]') ? el : el.querySelector('[data-sidebar-item-label]');
         var text = span ? norm(span.textContent) : norm(el.textContent);
         if (text.length > 80) return '';
         return usable(text);
@@ -2013,37 +1761,31 @@ final class WebViewStore {
           || lower === '/files' || lower.indexOf('/files/') === 0) return 'Library';
       if (lower.indexOf('/automation') === 0) return 'Automations';
       if (lower.indexOf('/skill') === 0) return 'Plugins';
-      if (lower.indexOf('/project') === 0) return 'Projects';
+      if (lower === '/project' || lower === '/project/') return 'Projects';
+      if (lower === '/history' || lower.indexOf('/history/') === 0) return 'History';
       if (path === '/' || path === '') return 'Grok';
 
-      // Hidden sidebar stays in the DOM (DEC-025). Reply h1/h2 is not the
-      // thread name — grok.com puts that on the /c/{id} row.
-      var conv = conversationKey(path);
-      if (conv) {
-        var links = document.querySelectorAll(
-          '[data-sidebar] a[href], [data-slot="sidebar"] a[href], nav a[href], aside a[href]'
-        );
-        for (var i = 0; i < links.length; i++) {
-          if (conversationKey(pathOf(links[i])) !== conv) continue;
-          var fromLink = labelOf(links[i]);
-          if (fromLink) return fromLink;
-        }
+      // Reply h1/h2 is not the thread name. grok.com prints the name in the
+      // band over the chat, which the titlebar covers, and on the sidebar's
+      // current row (the hidden sidebar stays in the DOM, DEC-025).
+      var heading = document.querySelector('#grok-content-area [data-testid="conversation-title"]');
+      if (heading) {
+        var fromHeading = labelOf(heading);
+        if (fromHeading) return fromHeading;
       }
 
       var active = document.querySelector(
-        '[data-sidebar] [aria-current="page"],'
-        + '[data-sidebar] [data-active="true"],'
-        + '[data-sidebar] [data-state="active"],'
-        + '[data-slot="sidebar"] [aria-current="page"]'
+        '#app-sidebar [aria-current="true"], #app-sidebar [aria-current="page"]'
       );
       if (active) {
         var fromActive = labelOf(active);
         if (fromActive) return fromActive;
       }
 
-      var title = norm(document.title);
+      // Every page is titled "<name> - Grok".
+      var title = norm(document.title).replace(/\\s+[-\\u2013\\u2014|]\\s+Grok$/i, '');
       if (!title || title.toLowerCase() === 'grok' || junk(title)) return '';
-      return title;
+      return usable(title);
     })();
     """
 
@@ -2107,11 +1849,6 @@ final class WebViewStore {
       function flatten(el) {
         if (!el || el === document.documentElement || el === document.body) return;
         if (el.getAttribute('data-grock-edge-shell')) return;
-        if (el.getAttribute('data-grock-content-inset')
-            || el.getAttribute('data-grock-home-inset')
-            || el.getAttribute('data-grock-scroll-restore')) {
-          return;
-        }
         el.setAttribute('data-grock-edge-shell', '1');
         el.style.setProperty('overflow', 'hidden', 'important');
         el.style.setProperty('overflow-x', 'hidden', 'important');
@@ -2165,6 +1902,48 @@ final class WebViewStore {
     """
 
     private static let pageScript = DownloadBridge.pageScript
+
+    #if DEBUG
+    /// Development builds only. `-pageScript /path/to/file.js` on the command
+    /// line (`open Grock.app --args -pageScript …`) injects that file into
+    /// grok.com at document end, for example to stand in generic content
+    /// while taking screenshots. Compiled out of Release.
+    private static func debugPageScript() -> String? {
+        guard let path = UserDefaults.standard.string(forKey: "pageScript"),
+              let script = try? String(contentsOfFile: path, encoding: .utf8),
+              !script.isEmpty else { return nil }
+        return script
+    }
+
+    /// Development builds only. `-pageProbe /path/to/dir` polls that folder
+    /// for `in.js`, runs it in grok.com as an async function body, and writes
+    /// the returned value to `out.json`. This is how selector drift gets
+    /// checked against the live page. Compiled out of Release.
+    private var debugProbeTimer: Timer?
+    private func startDebugPageProbe() {
+        guard let dir = UserDefaults.standard.string(forKey: "pageProbe"), !dir.isEmpty else { return }
+        let input = URL(fileURLWithPath: dir).appendingPathComponent("in.js")
+        let output = URL(fileURLWithPath: dir).appendingPathComponent("out.json")
+        debugProbeTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            guard let script = try? String(contentsOf: input, encoding: .utf8) else { return }
+            try? FileManager.default.removeItem(at: input)
+            Task { @MainActor in
+                self?.webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
+                    var reply: [String: Any]
+                    switch result {
+                    case .success(let value): reply = ["ok": true, "value": value]
+                    case .failure(let error): reply = ["ok": false, "error": String(describing: error)]
+                    }
+                    if !JSONSerialization.isValidJSONObject(reply) {
+                        reply = ["ok": true, "value": String(describing: reply["value"] ?? "")]
+                    }
+                    let data = (try? JSONSerialization.data(withJSONObject: reply, options: [.fragmentsAllowed])) ?? Data()
+                    try? data.write(to: output, options: .atomic)
+                }
+            }
+        }
+    }
+    #endif
 
     /// Honest "reply is done" hook (DEC-054). Chat Stop controls, not tokens.
     /// Voice is in-front; we do not watch Exit-voice. Idle when grok.com is idle:
@@ -2257,6 +2036,8 @@ final class WebViewStore {
       function lastAnswer() {
         var root = contentRoot();
         if (!root) return null;
+        var answers = root.querySelectorAll('[data-testid="assistant-message"]');
+        if (answers.length) return answers[answers.length - 1];
         var copy = lastCopy(root);
         if (copy) {
           return copy.closest('article')
@@ -2270,6 +2051,8 @@ final class WebViewStore {
       function findScroller() {
         var root = contentRoot();
         if (!root) return document.scrollingElement;
+        var transcript = root.querySelector('[data-testid="chat-transcript-scroller"]');
+        if (transcript) return transcript;
         var nodes = root.querySelectorAll('div, section, main, article');
         var best = null;
         var bestScore = -1;

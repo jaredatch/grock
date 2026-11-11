@@ -54,10 +54,14 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Exact page fill so a 1px window sliver cannot show as gray.
+    /// grok.com's own page fill (`--grok-chrome`: #F9F8F7 light, #1E1D1D
+    /// dark), so a 1px window sliver or a rubber-band edge cannot show as a
+    /// different shade.
     static var pageBackdrop: NSColor {
         NSColor(name: "GrockPageBackdrop") { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .black : .white
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(srgbRed: 30 / 255, green: 29 / 255, blue: 29 / 255, alpha: 1)
+                : NSColor(srgbRed: 249 / 255, green: 248 / 255, blue: 247 / 255, alpha: 1)
         }
     }
 }
