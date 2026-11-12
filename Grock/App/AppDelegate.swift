@@ -554,6 +554,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             center.addObserver(forName: .grockChromeDidChange, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in self?.panel?.syncToolbar() }
             },
+            // A restyled page takes its accent from System Settings.
+            center.addObserver(forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: .main) { _ in
+                if PageStyle.current != .grok { PageStyle.apply() }
+            },
             center.addObserver(forName: .grockSessionActionsDidChange, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in self?.panel?.syncToolbar() }
             },

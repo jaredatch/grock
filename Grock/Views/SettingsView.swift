@@ -125,6 +125,7 @@ struct GeneralSettingsPane: View {
 
 struct AppearanceSettingsPane: View {
     @AppStorage(AppearancePreference.defaultsKey) private var appearanceRaw = AppearancePreference.system.rawValue
+    @AppStorage(PageStyle.defaultsKey) private var pageStyleRaw = PageStyle.grok.rawValue
     @AppStorage(ChromePreference.hideSidebarOnLaunchKey) private var hideSidebarOnLaunch = true
     @AppStorage(ChromePreference.hideImagineKey) private var hideImagine = false
     @AppStorage(ChromePreference.hideLibraryKey) private var hideLibrary = false
@@ -150,6 +151,15 @@ struct AppearanceSettingsPane: View {
                         AppearancePreference.apply(mode)
                     }
                 }
+                Picker("Style", selection: $pageStyleRaw) {
+                    ForEach(PageStyle.allCases) { style in
+                        Text(style.title).tag(style.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: pageStyleRaw) { _, _ in PageStyle.apply() }
+            } footer: {
+                Text("Grok is grok.com as it ships. Mac restyles it to sit closer to a Mac app. Experimental.")
             }
 
             Section {
@@ -386,6 +396,7 @@ enum SettingsReset {
     static func restorePreferenceDefaults() {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: AppearancePreference.defaultsKey)
+        defaults.removeObject(forKey: PageStyle.defaultsKey)
         for key in ChromePreference.allKeys {
             defaults.removeObject(forKey: key)
         }
@@ -403,6 +414,7 @@ enum SettingsReset {
         _ = HotkeyManager.shared.setCombo(nil, for: .voiceChat)
         _ = HotkeyManager.shared.setCombo(.optionSpace, for: .quickChat)
         AppearancePreference.apply(.system)
+        PageStyle.apply()
         ChromePreference.applyLaunchSidebarPolicy()
         ChromePreference.apply()
         WebViewStore.shared.setWebInspectorEnabled(false)

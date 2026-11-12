@@ -287,6 +287,17 @@ final class GrockTests: XCTestCase {
 
     @MainActor
     func testPageBackdropMatchesGrokPageFill() throws {
+        // The fill follows Appearance → Style, so pin it for the test.
+        let defaults = UserDefaults.standard
+        let priorStyle = defaults.object(forKey: PageStyle.defaultsKey)
+        defer {
+            if let priorStyle {
+                defaults.set(priorStyle, forKey: PageStyle.defaultsKey)
+            } else {
+                defaults.removeObject(forKey: PageStyle.defaultsKey)
+            }
+        }
+        defaults.removeObject(forKey: PageStyle.defaultsKey)
         func backdrop(_ name: NSAppearance.Name) throws -> [Int] {
             var resolved: NSColor?
             try XCTUnwrap(NSAppearance(named: name)).performAsCurrentDrawingAppearance {
@@ -299,6 +310,10 @@ final class GrockTests: XCTestCase {
         // grok.com's --grok-chrome: #F9F8F7 light, #1E1D1D dark.
         XCTAssertEqual(try backdrop(.aqua), [0xF9, 0xF8, 0xF7, 255])
         XCTAssertEqual(try backdrop(.darkAqua), [0x1E, 0x1D, 0x1D, 255])
+        // A restyled page is plain white, or #1E1E1E in dark.
+        defaults.set(PageStyle.mac.rawValue, forKey: PageStyle.defaultsKey)
+        XCTAssertEqual(try backdrop(.aqua), [0xFF, 0xFF, 0xFF, 255])
+        XCTAssertEqual(try backdrop(.darkAqua), [0x1E, 0x1E, 0x1E, 255])
     }
 
     func testAppearancePreferenceTitles() {
@@ -375,6 +390,7 @@ final class GrockTests: XCTestCase {
         let defaults = UserDefaults.standard
         let keys = ChromePreference.allKeys + [
             AppearancePreference.defaultsKey,
+            PageStyle.defaultsKey,
             WebViewStore.webInspectorKey,
             AppDelegate.hideFromDockKey,
             AppDelegate.windowFrameKey
@@ -391,6 +407,7 @@ final class GrockTests: XCTestCase {
         }
 
         defaults.set(AppearancePreference.dark.rawValue, forKey: AppearancePreference.defaultsKey)
+        defaults.set(PageStyle.mac.rawValue, forKey: PageStyle.defaultsKey)
         defaults.set(false, forKey: ChromePreference.collapseSidebarKey)
         defaults.set(false, forKey: ChromePreference.sidebarHiddenKey)
         defaults.set(true, forKey: ChromePreference.hideImagineKey)
@@ -404,6 +421,7 @@ final class GrockTests: XCTestCase {
         SettingsReset.restorePreferenceDefaults()
 
         XCTAssertEqual(AppearancePreference.current, .system)
+        XCTAssertEqual(PageStyle.current, .grok)
         XCTAssertTrue(ChromePreference.current.collapseSidebar)
         XCTAssertTrue(ChromePreference.current.sidebarHidden)
         XCTAssertTrue(ChromePreference.current.hideGrokBot)

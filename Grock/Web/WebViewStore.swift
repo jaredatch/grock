@@ -155,28 +155,7 @@ final class WebViewStore {
             contentWorld: .page,
             name: SessionActionsBridge.channelName
         )
-        config.userContentController.addUserScript(
-            WKUserScript(source: Self.edgeFixScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
-        )
-        config.userContentController.addUserScript(
-            WKUserScript(source: Self.edgeFixScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-        )
-        config.userContentController.addUserScript(
-            WKUserScript(source: Self.pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
-        )
-        config.userContentController.addUserScript(
-            WKUserScript(source: Self.chromeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
-        )
-        config.userContentController.addUserScript(
-            WKUserScript(source: Self.replyObserverScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
-        )
-        #if DEBUG
-        if let script = Self.debugPageScript() {
-            config.userContentController.addUserScript(
-                WKUserScript(source: script, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-            )
-        }
-        #endif
+        Self.installUserScripts(on: config.userContentController)
 
         webViewDelegate.bridge = downloadBridge
 
@@ -203,11 +182,41 @@ final class WebViewStore {
         }
         applyAppearance(AppearancePreference.current.nsAppearance)
         applyWebInspector()
+        applyPageStyle()
         applyChrome()
         setWebViewCovered(true)
         loadHome()
         #if DEBUG
         startDebugPageProbe()
+        #endif
+    }
+
+    /// Every script Grock injects, in order. Run again when the page style
+    /// changes, so the next document starts with the style already chosen.
+    static func installUserScripts(on controller: WKUserContentController) {
+        controller.removeAllUserScripts()
+        let start: [String] = [
+            edgeFixScript,
+            themeConfigScript(),
+            themeScript,
+            pageScript,
+            chromeScript,
+            replyObserverScript
+        ]
+        for source in start {
+            controller.addUserScript(
+                WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            )
+        }
+        controller.addUserScript(
+            WKUserScript(source: edgeFixScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
+        #if DEBUG
+        if let script = debugPageScript() {
+            controller.addUserScript(
+                WKUserScript(source: script, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            )
+        }
         #endif
     }
 
@@ -300,6 +309,7 @@ final class WebViewStore {
     func handleNavigationFinished() {
         recoveryState = nil
         refreshViewportUnitsIfStale()
+        applyPageStyle()
         applyChrome()
         if pendingPayload != nil {
             waitingForComposer = true
@@ -1792,7 +1802,15 @@ final class WebViewStore {
     /// Drive `prefers-color-scheme` for the page via the WebView's appearance.
     func applyAppearance(_ appearance: NSAppearance?) {
         webView.appearance = appearance
-        webView.underPageBackgroundColor = AppearancePreference.pageBackdrop
+        applyPageBackdrop()
+    }
+
+    /// Match everything behind the page to the page: the WebView's own
+    /// backdrop and the window around it.
+    func applyPageBackdrop() {
+        webView.underPageBackgroundColor = PageStyle.current.hasGlassSidebar
+            ? .clear
+            : AppearancePreference.pageBackdrop
         for window in NSApp.windows {
             (window as? FloatingPanel)?.applyPageBackdrop()
         }

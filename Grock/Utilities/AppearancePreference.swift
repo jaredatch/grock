@@ -54,15 +54,93 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
         }
     }
 
-    /// grok.com's own page fill (`--grok-chrome`: #F9F8F7 light, #1E1D1D
-    /// dark), so a 1px window sliver or a rubber-band edge cannot show as a
-    /// different shade.
+    /// The page's own fill, so a 1px window sliver or a rubber-band edge
+    /// cannot show as a different shade. grok.com's is `--grok-chrome`
+    /// (#F9F8F7 light, #1E1D1D dark); the Mac style is plain white or
+    /// #1E1E1E.
     static var pageBackdrop: NSColor {
-        NSColor(name: "GrockPageBackdrop") { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 30 / 255, green: 29 / 255, blue: 29 / 255, alpha: 1)
-                : NSColor(srgbRed: 249 / 255, green: 248 / 255, blue: 247 / 255, alpha: 1)
+        switch PageStyle.current {
+        case .grok:
+            return NSColor(name: "GrockPageBackdrop") { appearance in
+                appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                    ? NSColor(srgbRed: 30 / 255, green: 29 / 255, blue: 29 / 255, alpha: 1)
+                    : NSColor(srgbRed: 249 / 255, green: 248 / 255, blue: 247 / 255, alpha: 1)
+            }
+        case .mac:
+            return NSColor(name: "GrockPlainPageBackdrop") { appearance in
+                appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                    ? NSColor(srgbRed: 30 / 255, green: 30 / 255, blue: 30 / 255, alpha: 1)
+                    : .white
+            }
         }
+    }
+}
+
+/// How grok.com is dressed (Appearance → Style, DEC-073). The Mac
+/// overrides live in `GrokThemeScript.swift`.
+enum PageStyle: String, CaseIterable, Identifiable {
+    /// grok.com as it ships.
+    case grok
+    /// Neutral colors, the system font and accent, a Finder-style sidebar
+    /// on glass, and AppKit-style controls.
+    case mac
+
+    static let defaultsKey = "app.pageStyle"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .grok: return "Grok"
+        case .mac: return "Mac"
+        }
+    }
+
+    /// The Mac sidebar is see-through, with the window's glass behind it.
+    var hasGlassSidebar: Bool { self == .mac }
+
+    static var current: PageStyle {
+        if let raw = UserDefaults.standard.string(forKey: defaultsKey),
+           let value = PageStyle(rawValue: raw) {
+            return value
+        }
+        return .grok
+    }
+
+    static func setCurrent(_ value: PageStyle) {
+        UserDefaults.standard.set(value.rawValue, forKey: defaultsKey)
+        apply()
+    }
+
+    static func apply() {
+        Task { @MainActor in
+            WebViewStore.shared.pageStyleDidChange()
+        }
+    }
+
+    /// What the theme script needs: the style, and the accent color from
+    /// System Settings in both appearances.
+    var scriptConfig: String {
+        let config = [
+            "style": self == .grok ? "" : rawValue,
+            "accentLight": Self.accentHex(.aqua),
+            "accentDark": Self.accentHex(.darkAqua)
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: config, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8)
+        else { return "{}" }
+        return text
+    }
+
+    static func accentHex(_ name: NSAppearance.Name) -> String {
+        var resolved: NSColor?
+        NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+            resolved = NSColor.controlAccentColor.usingColorSpace(.sRGB)
+        }
+        guard let color = resolved else { return name == .darkAqua ? "#0a84ff" : "#007aff" }
+        let parts = [color.redComponent, color.greenComponent, color.blueComponent]
+            .map { Int(($0 * 255).rounded()) }
+        return String(format: "#%02x%02x%02x", parts[0], parts[1], parts[2])
     }
 }
 

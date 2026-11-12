@@ -36,7 +36,7 @@ Web bridge            Grock/Web                  WKWebView owner, injected scrip
 Utilities / settings  Grock/Utilities            AppInfo, preferences, download paths, CLI installer
 ```
 
-`WebViewStore` owns the WebView, navigation, composer handoff, and recovery state, plus the page script that notices a reply finishing. `WebNavigation.swift` has `NavigationPolicy`, the navigation delegates, and the guarded download bridge. `GrokChromeScript.swift` adapts grok.com's page chrome (the controls the titlebar replaces, sidebar, hidden features, promo cards). `QuickChatPayload.swift` is the package Quick Chat hands the page, size limits included. `ReplyMonitor.swift` tracks the unread answer behind the Dock badge. `WebRecovery.swift` draws the native Retry, Open in Browser, and download footer. On the app side, `UpdaterController.swift` wraps Sparkle and `AuthPopupPresenter.swift` hosts sign-in popups.
+`WebViewStore` owns the WebView, navigation, composer handoff, and recovery state, plus the page script that notices a reply finishing. `WebNavigation.swift` has `NavigationPolicy`, the navigation delegates, and the guarded download bridge. `GrokChromeScript.swift` adapts grok.com's page chrome (the controls the titlebar replaces, sidebar, hidden features, promo cards). `GrokThemeScript.swift` holds the optional Mac style: overrides for grok.com's CSS custom properties, plus the script that keeps them in the page (DEC-073). `QuickChatPayload.swift` is the package Quick Chat hands the page, size limits included. `ReplyMonitor.swift` tracks the unread answer behind the Dock badge. `WebRecovery.swift` draws the native Retry, Open in Browser, and download footer. On the app side, `UpdaterController.swift` wraps Sparkle and `AuthPopupPresenter.swift` hosts sign-in popups.
 
 Injected scripts follow two rules. First, they stay idle when grok.com is idle. The chrome script folds a burst of DOM changes into one animation frame plus one throttled 200 ms pass, and that second pass keeps things current when an occluded window stops getting frames. Second, they never observe attributes we wrote ourselves.
 
@@ -60,7 +60,7 @@ Toolbar, left to right: Sidebar toggle, the place or conversation title (a menu 
 
 Close means hide. Interactive launch shows the window; login-item launch stays quiet (DEC-018). A cold grok.com load is covered by a small native orbit animation until the page has a composer (DEC-042). The app menu is a normal Mac app menu, not a mini-browser (DEC-033). The status item is a system menu: Show Grock, New Chat, Settings, Quit. An unread answer badges the Dock (DEC-054).
 
-Settings is an AppDelegate-owned toolbar-tab window: General (hotkeys, clipboard capture, Dock, login item), Appearance (theme, hide grok.com chrome), Account (open the current page in a browser, clear web data), Advanced (Web Inspector, CLI install, reset). About is the system About panel.
+Settings is an AppDelegate-owned toolbar-tab window: General (hotkeys, clipboard capture, Dock, login item), Appearance (theme, style, hide grok.com chrome), Account (open the current page in a browser, clear web data), Advanced (Web Inspector, CLI install, reset). About is the system About panel.
 
 ## Sandbox and entitlements
 
@@ -94,7 +94,7 @@ Swift 5.10, Xcode 26, macOS 26.0 or later, Apple silicon. Not Swift 6 strict con
 Grock/
   GrockApp.swift          # @main entry and menu commands
   App/                    # AppDelegate, panel, hotkeys, Quick Chat, file intake, URL scheme, updater
-  Web/                    # WebViewStore, navigation and downloads, chrome script, payload, reply tracking, recovery
+  Web/                    # WebViewStore, navigation and downloads, chrome and theme scripts, payload, reply tracking, recovery
   Views/                  # SwiftUI (Settings panes, Quick Chat view)
   Utilities/              # AppInfo, preferences, download paths, CLI installer
   Grock.entitlements      # generated from project.yml

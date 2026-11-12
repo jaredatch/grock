@@ -210,3 +210,19 @@ Grock now keeps a navigation in the WebView when it has that exact shape: it sta
 Signed out, there's one thing to do, so the page shows only Sign in. Grock hides grok.com's logo, Settings, Sign up, and Google's one-tap card, and the title menu offers only New Chat. The cookie notice is never touched.
 
 Cost: Sign up isn't on the page any more, though grok.com's Log in window still links to it. If you start signing in and change your mind, New Chat in the title menu is the way back. Only the X path has been run as far as its login page; Apple, Google, and GitHub follow the same rule but haven't been tried.
+
+## DEC-073. An optional Mac style
+
+grok.com's November design is warmer and more its own thing than the neutral page Grock started on: cream fills, a brown tint in every hover, its own typeface, 40px sidebar rows. Inside a Mac window it reads as a website. Appearance → Style now has a second choice, Mac, that restyles the page to sit closer to Finder. Grok, the page as it ships, stays the default while the Mac style is experimental.
+
+grok.com paints from a few dozen CSS custom properties: an ink color, a wash that tints every fill, two surfaces, an accent, three font stacks, some sizes. The Mac style overrides those and adds a short list of rules for the sidebar, menus, and switches. Those rules match ids, roles, and `data-` attributes, as the chrome script does (DEC-071). All of it lives in `GrokThemeScript.swift`.
+
+What it changes:
+
+- Neutral grays for the warm ones, the system font, and the accent color from System Settings.
+- macOS font smoothing. grok.com turns it off, which draws the same font thinner than Finder does.
+- A sidebar measured against Finder: 32pt rows, 13pt labels, accent glyphs, a gray fill and a semibold label on the selected row, no hover highlight.
+- A sidebar you can see the wallpaper through, faintly. The page paints it mostly opaque and the window keeps a glass view behind the WebView.
+- Menus on a blurred backdrop, with the highlighted item in the accent color. Accent switches and default buttons. An arrow cursor over controls.
+
+Cost: this rides on grok.com's property names, so a redesign will undo it. It fails soft, back to grok.com's own look, though a partial rename could leave a mixed one for a release. The glyphs are still grok.com's and thinner than Apple's. The see-through sidebar needs the WebView not to paint its own background, and macOS has no public switch for that, so Grock sets the `drawsBackground` key WebKit has long answered to and checks that it's still there first. If it goes away, the sidebar falls back to plain gray.

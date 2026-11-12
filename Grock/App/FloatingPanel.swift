@@ -352,6 +352,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
     private var launchLoadingObserver: NSObjectProtocol?
     private var recoveryView: WebRecoveryView?
     private var downloadStatus: DownloadStatusView?
+    private var sidebarMaterialView: NSGlassEffectView?
     private var downloadStatusHeight: NSLayoutConstraint?
     private var feedbackObservers: [NSObjectProtocol] = []
 
@@ -1116,7 +1117,28 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
         let host = NSView(frame: contentRect(forFrameRect: frame))
         host.autoresizingMask = [.width, .height]
         host.wantsLayer = true
-        host.layer?.backgroundColor = AppearancePreference.pageBackdrop.cgColor
+        host.layer?.backgroundColor = PageStyle.current.hasGlassSidebar
+            ? NSColor.clear.cgColor
+            : AppearancePreference.pageBackdrop.cgColor
+
+        // Shows only through the page's sidebar, which is see-through in
+        // the Mac style. Everything else in the page is opaque.
+        // Glass, like Finder's sidebar: it takes a soft tint from the
+        // wallpaper and ignores the windows behind this one. The older
+        // behind-window sidebar material shows every one of them.
+        let material = NSGlassEffectView()
+        material.style = .regular
+        material.cornerRadius = 0
+        material.translatesAutoresizingMaskIntoConstraints = false
+        material.isHidden = !PageStyle.current.hasGlassSidebar
+        host.addSubview(material)
+        NSLayoutConstraint.activate([
+            material.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            material.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            material.topAnchor.constraint(equalTo: host.topAnchor),
+            material.bottomAnchor.constraint(equalTo: host.bottomAnchor)
+        ])
+        sidebarMaterialView = material
 
         host.addSubview(webView)
         let status = DownloadStatusView()
@@ -1388,8 +1410,12 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
     }
 
     func applyPageBackdrop() {
+        let translucent = PageStyle.current.hasGlassSidebar
         backgroundColor = AppearancePreference.pageBackdrop
-        contentView?.layer?.backgroundColor = AppearancePreference.pageBackdrop.cgColor
+        sidebarMaterialView?.isHidden = !translucent
+        contentView?.layer?.backgroundColor = translucent
+            ? NSColor.clear.cgColor
+            : AppearancePreference.pageBackdrop.cgColor
     }
 }
 

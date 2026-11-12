@@ -41,6 +41,7 @@
 		AAAAC28B0CBD9882EFB3A7F9 /* GrokWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D49AC1FFDF067239FE9275B /* GrokWebView.swift */; };
 		B46E391CC4D0567207133E49 /* GrockURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82B1223F69AAF7E09A6A1240 /* GrockURL.swift */; };
 		BD8B810A94B3E7475CB1BDFD /* GrockCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A814186F0BD628492C9F5DA3 /* GrockCommand.swift */; };
+		C5DA6A93200603E085D404D9 /* PageStyleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1932FE0DDF2BC75DB04A8EC6 /* PageStyleTests.swift */; };
 		C94882F2D2ABCF1B477C63B1 /* QuickChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E77AAEFCE4274AD40CF8F9B /* QuickChatView.swift */; };
 		CA35D38687C8E7BC3F6D62B9 /* GrockCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A814186F0BD628492C9F5DA3 /* GrockCommand.swift */; };
 		CC02EDB44249A4E964CA1B68 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E04107269BD69EE3C3D0E2E /* SettingsView.swift */; };
@@ -49,6 +50,7 @@
 		E1C7234A8E0565ADC77A4534 /* PasteboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47AC0C176C96CDAB9FA9060B /* PasteboardMonitor.swift */; };
 		E587FC7300E837957939F7CE /* CLIInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201F1DAB257252C6E55A478 /* CLIInstallerTests.swift */; };
 		EAEAFFC13D883F0A517DD0BB /* MoveToProjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A55CA7B5E6BDE62CD3CA1E /* MoveToProjectTests.swift */; };
+		F6E4F00335790159258BFD3D /* GrokThemeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = F224E60FDA62F90454BE3A60 /* GrokThemeScript.swift */; };
 		F7EE5D48EC4F4E7293B479BD /* CorePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3E76D74163DE77562282A1 /* CorePolicyTests.swift */; };
 		F9383913E7C4997787733D71 /* WebNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC9E2AB24FA5CEB30089EC0 /* WebNavigation.swift */; };
 		FC728A88A5CBC07A74E59036 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA117A87B5EB6D5E5C9CCD13 /* AppDelegate.swift */; };
@@ -75,6 +77,7 @@
 		02CD0EC708A3976D98DBF3A6 /* AppNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotifications.swift; sourceTree = "<group>"; };
 		0E77AAEFCE4274AD40CF8F9B /* QuickChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatView.swift; sourceTree = "<group>"; };
 		0FC9E2AB24FA5CEB30089EC0 /* WebNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebNavigation.swift; sourceTree = "<group>"; };
+		1932FE0DDF2BC75DB04A8EC6 /* PageStyleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageStyleTests.swift; sourceTree = "<group>"; };
 		1F3E76D74163DE77562282A1 /* CorePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorePolicyTests.swift; sourceTree = "<group>"; };
 		21DC4F21181AC31F7101142F /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
 		264755FDFA451D64AAD4E857 /* QuickChatPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickChatPayload.swift; sourceTree = "<group>"; };
@@ -116,6 +119,7 @@
 		E78BB0A0103E5AC34A626A62 /* DownloadPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPaths.swift; sourceTree = "<group>"; };
 		E83662634ED3251F7B817681 /* AppearancePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
 		EA94E5CD3C2F25596B4F948B /* LaunchReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchReason.swift; sourceTree = "<group>"; };
+		F224E60FDA62F90454BE3A60 /* GrokThemeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrokThemeScript.swift; sourceTree = "<group>"; };
 		F4B5BACB0A1767F5DF8F1B0B /* ReplyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMonitor.swift; sourceTree = "<group>"; };
 		FE8553E4237C335938DDE298 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -226,6 +230,7 @@
 				438409FE6D20665EDFEE896D /* FileHandoffTests.swift */,
 				9C64D4385DD542031771748C /* GrockTests.swift */,
 				B2A55CA7B5E6BDE62CD3CA1E /* MoveToProjectTests.swift */,
+				1932FE0DDF2BC75DB04A8EC6 /* PageStyleTests.swift */,
 				69654E1C933CCC7181D8BF8C /* WebBoundaryTests.swift */,
 				CE00A9D0F5938635B8F30131 /* WebRecoveryTests.swift */,
 			);
@@ -236,6 +241,7 @@
 			isa = PBXGroup;
 			children = (
 				B2FE46DCB8958CA54BF6EAF4 /* GrokChromeScript.swift */,
+				F224E60FDA62F90454BE3A60 /* GrokThemeScript.swift */,
 				2D49AC1FFDF067239FE9275B /* GrokWebView.swift */,
 				264755FDFA451D64AAD4E857 /* QuickChatPayload.swift */,
 				F4B5BACB0A1767F5DF8F1B0B /* ReplyMonitor.swift */,
@@ -398,6 +404,7 @@
 				389711197A2E9AA1C4B61360 /* FileHandoffTests.swift in Sources */,
 				65228872A7D15AA8CD6E6B51 /* GrockTests.swift in Sources */,
 				EAEAFFC13D883F0A517DD0BB /* MoveToProjectTests.swift in Sources */,
+				C5DA6A93200603E085D404D9 /* PageStyleTests.swift in Sources */,
 				3A567F723F643D8C49C6408A /* WebBoundaryTests.swift in Sources */,
 				35C4053CDFAC53C12F139FFB /* WebRecoveryTests.swift in Sources */,
 			);
@@ -431,6 +438,7 @@
 				CA35D38687C8E7BC3F6D62B9 /* GrockCommand.swift in Sources */,
 				B46E391CC4D0567207133E49 /* GrockURL.swift in Sources */,
 				3933DD33F9EA4AC122F40C8D /* GrokChromeScript.swift in Sources */,
+				F6E4F00335790159258BFD3D /* GrokThemeScript.swift in Sources */,
 				AAAAC28B0CBD9882EFB3A7F9 /* GrokWebView.swift in Sources */,
 				5B2B721EB1F52FE6ED026B0A /* HotkeyManager.swift in Sources */,
 				8728BCB532C145EE4BFE18B5 /* LaunchAtLogin.swift in Sources */,
