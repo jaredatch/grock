@@ -872,6 +872,10 @@ final class GrockTests: XCTestCase {
         // The page script and the panel agree on the titlebar's height.
         XCTAssertEqual(PanelGeometry.fallbackTitlebarInset, 52)
         XCTAssertTrue(WebViewStore.chromeScript.contains("--grock-titlebar:52px"))
+        // grok.com's own ramp leaves a scrolled thread readable behind the bar.
+        XCTAssertTrue(WebViewStore.chromeScript.contains(
+            "[data-overflow-y-start]:has(> [data-testid=\"chat-transcript-scroller\"])"))
+        XCTAssertTrue(WebViewStore.chromeScript.contains("transparent 30px,rgba(0,0,0,.5) 54px,#000 80px"))
         XCTAssertTrue(WebViewStore.focusInputScript.contains("[contenteditable]"))
         XCTAssertTrue(WebViewStore.focusInputScript.contains("attempt(tries"))
         XCTAssertEqual(TitleDestination.history.href, "/history")

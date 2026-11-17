@@ -96,6 +96,7 @@ extension WebViewStore {
           + ':root{--grock-titlebar:52px;}'
           + titlebarCSS()
           + pageHeaderCSS()
+          + transcriptFadeCSS()
           + rightPaneCSS()
           + lightboxCSS()
           + signedOutCSS()
@@ -125,6 +126,18 @@ extension WebViewStore {
           + '{visibility:hidden!important;pointer-events:none!important;}'
           + scoped('html:not([data-grock-page-header-hidden]) ', PAGE_HEADER)
           + '{top:var(--grock-titlebar)!important;}';
+      }
+
+      function transcriptFadeCSS() {
+        // grok.com fades a scrolled thread out with a straight ramp across
+        // its 56px band, which leaves text half visible behind the titlebar's
+        // controls. Mask the scroller's wrapper as well, so the two multiply:
+        // nothing shows for the first 30px and the thread is whole by 80px.
+        // The wrapper carries data-overflow-y-start only once the thread has
+        // scrolled, and an unscrolled thread starts below 80px.
+        var mask = 'linear-gradient(to bottom,transparent 0,transparent 30px,rgba(0,0,0,.5) 54px,#000 80px)';
+        return '#grok-content-area [data-overflow-y-start]:has(> [data-testid="chat-transcript-scroller"])'
+          + '{-webkit-mask-image:' + mask + '!important;mask-image:' + mask + '!important;}';
       }
 
       function rightPaneCSS() {

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- A chat scrolled under the titlebar fades out properly again. Since 1.0.3 the text stayed half visible behind the title and buttons.
+
 ## 1.0.3 (2026-11-11)
 
 grok.com shipped a new design, and a lot of Grock stopped lining up with it. This release catches up.
