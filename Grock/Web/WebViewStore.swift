@@ -186,6 +186,15 @@ final class WebViewStore {
         applyChrome()
         setWebViewCovered(true)
         loadHome()
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                     NSWindow.didBecomeMainNotification, NSWindow.didResignMainNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                Task { @MainActor in
+                    guard let self, (note.object as? NSWindow) === self.webView.window else { return }
+                    self.applyWindowActivity()
+                }
+            }
+        }
         #if DEBUG
         startDebugPageProbe()
         #endif

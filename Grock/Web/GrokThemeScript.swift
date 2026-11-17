@@ -18,7 +18,15 @@ import WebKit
 // Sidebar numbers come from Finder: rows 32pt tall and 10pt in from the
 // edge, 13pt regular labels, 11pt semibold headers, glyphs in the accent
 // color, and a gray fill with a semibold label on the selected row. Finder
-// rows have no hover state.
+// rows have no hover state; ours get a fainter fill of the same gray,
+// since these rows are links and a web page is expected to answer the
+// pointer. Show more closes a group in the small type of its header,
+// and answers the pointer by darkening its text, with no fill.
+//
+// Spacing follows Finder too. New chat sits outside grok.com's scrolling
+// list and Library inside it, with a gap between; closing that gap makes
+// them one group. Groups butt against each other, so a header's own 32pt
+// is all that separates the last row of one from the first of the next.
 extension WebViewStore {
     /// Color and type. Neutral grays for grok.com's warm ones, the system
     /// font for its own, and the accent color from System Settings.
@@ -115,6 +123,7 @@ extension WebViewStore {
     --grok-text-tertiary:light-dark(#0000007a,#ffffff7a)!important;
     }
     html:root #app-sidebar > div:first-child{padding-inline:2px!important;box-sizing:border-box!important;}
+    html:root #app-sidebar [data-slot^="sidebar-scrolling"]{padding-top:5px!important;gap:0!important;}
     html:root #app-sidebar [data-icon-size-owner]{color:var(--grock-accent)!important;}
     html:root #app-sidebar button:has(> span > [data-sidebar-item-label]){padding-inline:9px!important;}
     html:root #app-sidebar button:has(> span > [data-sidebar-item-label]) > span{gap:9px!important;}
@@ -122,11 +131,31 @@ extension WebViewStore {
     html:root #app-sidebar :is([data-selected="true"],button[aria-current="true"]),html:root #app-sidebar [data-slot^="sidebar-scrolling"] :is([data-selected="true"],button[aria-current="true"]):hover{background-color:light-dark(#00000017,#ffffff1f)!important;}
     html:root #app-sidebar [data-selected="true"] button[aria-current="true"],html:root #app-sidebar [data-slot^="sidebar-scrolling"] [data-selected="true"] button[aria-current="true"]:hover{background-color:transparent!important;}
     html:root #app-sidebar button[aria-current="true"] [data-sidebar-item-label]{font-weight:600!important;}
+    html:root #app-sidebar button:has(> span > [data-sidebar-item-label]):not([aria-current="true"]):is(:hover,:has(~ span:hover)){background-color:light-dark(#0000000d,#ffffff12)!important;}
+    html:root #app-sidebar [data-reorder-item] div:has(> div) > button:has(> span > [data-sidebar-item-label]){height:24px!important;min-height:0!important;}
+    html:root #app-sidebar [data-reorder-item] div:has(> div) > button:has(> span > [data-sidebar-item-label]) [data-sidebar-item-label]{font-size:11px!important;font-weight:500!important;}
+    html:root #app-sidebar [data-reorder-item] div:has(> div) > button:has(> span > [data-sidebar-item-label]):hover{background-color:transparent!important;}
+    html:root #app-sidebar [data-reorder-item] div:has(> div) > button:has(> span > [data-sidebar-item-label]):hover [data-sidebar-item-label]{color:light-dark(#000000d9,#ffffffd9)!important;}
     html:root #app-sidebar div:has(> button[aria-controls][aria-keyshortcuts]){height:32px!important;padding:13px 8px 0 7px!important;}
     html:root #app-sidebar div:has(> button[aria-controls][aria-keyshortcuts]) span{font-weight:600!important;}
     html:root #app-sidebar button[aria-keyshortcuts="Meta+J"]{background-color:transparent!important;box-shadow:none!important;margin:0!important;}
     html:root #app-sidebar footer{--grok-font-size-body:13px!important;font-size:13px!important;}
     html:root #app-sidebar footer button[data-account-action]{background-color:transparent!important;box-shadow:none!important;}
+    """
+
+    /// The sidebar of a window that is not in front, as Finder draws it:
+    /// glyphs lose the accent color, labels and headers fade, and the
+    /// selected row's fill lightens. CSS cannot see window focus in a page
+    /// (`:window-inactive` only reaches scrollbars and selections), so the
+    /// app sets `data-grock-window-inactive` on `<html>`.
+    static let macInactiveCSS = """
+    html:root[data-grock-window-inactive] #app-sidebar{
+    --grok-text-chrome:light-dark(#0000008c,#ffffff8c)!important;
+    --grok-text-tertiary:light-dark(#00000047,#ffffff47)!important;
+    }
+    html:root[data-grock-window-inactive] #app-sidebar :is([data-icon-size-owner],button[aria-current="true"] [data-sidebar-item-label]){color:light-dark(#0000008c,#ffffff8c)!important;}
+    html:root[data-grock-window-inactive] #app-sidebar :is([data-selected="true"],button[aria-current="true"]),html:root[data-grock-window-inactive] #app-sidebar [data-slot^="sidebar-scrolling"] :is([data-selected="true"],button[aria-current="true"]):hover{background-color:light-dark(#0000000f,#ffffff14)!important;}
+    html:root[data-grock-window-inactive] #app-sidebar [data-selected="true"] button[aria-current="true"],html:root[data-grock-window-inactive] #app-sidebar [data-slot^="sidebar-scrolling"] [data-selected="true"] button[aria-current="true"]:hover{background-color:transparent!important;}
     """
 
     /// Controls as AppKit draws them: switches and the highlighted menu item
@@ -145,7 +174,7 @@ extension WebViewStore {
     /// Idle unless the style changes or grok.com rebuilds `<head>`.
     static let themeScript: String = {
         let styles: [String: String] = [
-            PageStyle.mac.rawValue: macTokenCSS + macSidebarCSS + macControlCSS
+            PageStyle.mac.rawValue: macTokenCSS + macSidebarCSS + macInactiveCSS + macControlCSS
         ]
         let json = (try? JSONSerialization.data(withJSONObject: styles))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
@@ -155,8 +184,9 @@ extension WebViewStore {
           if (host !== 'grok.com' && host.slice(-9) !== '.grok.com') return;
           if (window.__grockTheme) return;
           var STYLE_ID = 'grock-theme-style';
+          var INACTIVE = 'data-grock-window-inactive';
           var STYLES = \(json);
-          var state = { style: '', accentLight: '#007aff', accentDark: '#0a84ff' };
+          var state = { style: '', accentLight: '#007aff', accentDark: '#0a84ff', inactive: false };
 
           function hex(value, fallback) {
             return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback;
@@ -165,6 +195,7 @@ extension WebViewStore {
           function merge(next) {
             if (!next || typeof next !== 'object') return;
             if (typeof next.style === 'string') state.style = next.style;
+            if (typeof next.inactive === 'boolean') state.inactive = next.inactive;
             state.accentLight = hex(next.accentLight, state.accentLight);
             state.accentDark = hex(next.accentDark, state.accentDark);
           }
@@ -181,6 +212,11 @@ extension WebViewStore {
             if (!root) return;
             var css = sheet();
             var el = document.getElementById(STYLE_ID);
+            if (css && state.inactive) {
+              if (!root.hasAttribute(INACTIVE)) root.setAttribute(INACTIVE, '');
+            } else if (root.hasAttribute(INACTIVE)) {
+              root.removeAttribute(INACTIVE);
+            }
             if (!css) {
               if (el) el.remove();
               return;
@@ -233,6 +269,18 @@ extension WebViewStore {
         applyPageStyle()
     }
 
+    /// Tell the page whether its window is in front, so the Mac sidebar can
+    /// dim the way Finder's does. A window counts as in front while it is
+    /// key or main, which keeps the sidebar lit under a sheet or a menu.
+    func applyWindowActivity() {
+        let window = webView.window
+        let inactive = !(window?.isKeyWindow == true || window?.isMainWindow == true)
+        webView.evaluateJavaScript(
+            "window.__grockTheme && window.__grockTheme.set({ inactive: \(inactive) });",
+            completionHandler: nil
+        )
+    }
+
     /// Push the current style into the page (live, no reload) and line the
     /// native window up with it.
     func applyPageStyle(_ style: PageStyle = .current) {
@@ -241,6 +289,7 @@ extension WebViewStore {
             "window.__grockThemeConfig = \(json); window.__grockTheme && window.__grockTheme.set(\(json));",
             completionHandler: nil
         )
+        applyWindowActivity()
         // WKWebView has no public switch for an unpainted background on macOS.
         // This key is the long-standing way to get one. If WebKit ever drops
         // it, the sidebar falls back to the window's plain backdrop.

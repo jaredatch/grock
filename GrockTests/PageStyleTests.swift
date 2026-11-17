@@ -26,6 +26,28 @@ final class PageStyleTests: XCTestCase {
         XCTAssertEqual(plain?["left"] as? Bool, false)
     }
 
+    /// The Mac sidebar dims when the window is not in front. The page cannot
+    /// see that for itself, so the app marks `<html>`, and only while a
+    /// style is on.
+    func testWindowActivityMarksTheStyledPage() async throws {
+        let page = try await load(url: "https://grok.com/", style: .mac)
+        defer { page.window.close() }
+        let result = try await page.webView.callAsyncJavaScript("""
+        var root = document.documentElement, mark = 'data-grock-window-inactive', seen = {};
+        seen.start = root.hasAttribute(mark);
+        window.__grockTheme.set({ inactive: true });
+        seen.inactive = root.hasAttribute(mark);
+        window.__grockTheme.set({ inactive: false });
+        seen.active = root.hasAttribute(mark);
+        window.__grockTheme.set({ inactive: true });
+        window.__grockTheme.set({ style: '' });
+        seen.unstyled = root.hasAttribute(mark);
+        return seen;
+        """, in: nil, contentWorld: .page) as? [String: Bool]
+        XCTAssertEqual(result, ["start": false, "inactive": true, "active": false, "unstyled": false])
+        XCTAssertTrue(WebViewStore.macInactiveCSS.contains("html:root[data-grock-window-inactive] #app-sidebar"))
+    }
+
     /// Sign-in happens on other hosts, in the same WebView. They are never restyled.
     func testOtherHostsAreLeftAlone() async throws {
         let page = try await load(url: "https://accounts.x.ai/sign-in", style: .mac)

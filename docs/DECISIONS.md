@@ -221,7 +221,7 @@ What it changes:
 
 - Neutral grays for the warm ones, the system font, and the accent color from System Settings.
 - macOS font smoothing. grok.com turns it off, which draws the same font thinner than Finder does.
-- A sidebar measured against Finder: 32pt rows, 13pt labels, accent glyphs, a gray fill and a semibold label on the selected row, no hover highlight.
+- A sidebar measured against Finder: 32pt rows, 13pt labels, accent glyphs, a gray fill and a semibold label on the selected row. Finder has no hover highlight; we tried that and the rows felt dead, so hover gets a fainter fill of the same gray. Show more is set in the small type of a section header, so it reads as the end of a group and not as one more chat, and on hover its text darkens with no fill. When the window is not in front the sidebar dims as Finder's does: gray glyphs, faded labels, a lighter selected row. A page cannot see window focus, so the app marks `<html>` when it changes.
 - A sidebar you can see the wallpaper through, faintly. The page paints it mostly opaque and the window keeps a glass view behind the WebView.
 - Menus on a blurred backdrop, with the highlighted item in the accent color. Accent switches and default buttons. An arrow cursor over controls.
 
