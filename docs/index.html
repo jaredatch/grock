@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grock: a native Mac app for grok.com</title>
+<meta name="description" content="Grock puts grok.com in a real Mac window and adds Quick Chat on a global hotkey, files from Finder and the Dock, and a Dock badge when Grok answers. Free, open source, unofficial. No API key.">
+<link rel="canonical" href="https://jaredatch.github.io/grock/">
+<link rel="icon" type="image/png" href="assets/icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Grock: Grok, at home on your Mac">
+<meta property="og:description" content="A native Mac app for grok.com. Quick Chat on ⌥Space, files from Finder, a Dock badge when Grok answers. Unofficial.">
+<meta property="og:url" content="https://jaredatch.github.io/grock/">
+<meta property="og:image" content="https://jaredatch.github.io/grock/assets/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Grock",
+  "description": "An unofficial native Mac app for grok.com with Quick Chat on a global hotkey, file handoff from Finder and the Dock, and a Dock badge when Grok answers.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "macOS 26 or later, Apple silicon",
+  "url": "https://jaredatch.github.io/grock/",
+  "downloadUrl": "https://github.com/jaredatch/grock/releases/latest",
+  "license": "https://opensource.org/license/mit",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "Jared Atchison", "url": "https://github.com/jaredatch" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Is there a Grok app for Mac?",
+      "acceptedAnswer": { "@type": "Answer", "text": "As of November 2026, xAI doesn't make a Mac app for chatting on grok.com. Its Mac app, Grok Bot, is for handing work to agents. Grock is an unofficial app that puts grok.com in a Mac window, signed in with the account you already have." } },
+    { "@type": "Question", "name": "Is Grock official?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Grock is an independent, open source project. It isn't affiliated with xAI or SpaceX. Grok is xAI's product, and Grock is a fan-made shell around it." } },
+    { "@type": "Question", "name": "Do I need an API key or a paid plan?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Grock is free, and you sign in with an ordinary grok.com account, free or SuperGrok. Your limits are whatever your account already has." } },
+    { "@type": "Question", "name": "What does Grock send, and where?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Your prompts and files go to grok.com, the same as in a browser, and only when you press Return. Grock has no server and no telemetry. The only other place it contacts is GitHub, to check for updates." } },
+    { "@type": "Question", "name": "Which Macs does Grock run on?",
+      "acceptedAnswer": { "@type": "Answer", "text": "macOS 26 or later on Apple silicon." } }
+  ]
+}
+</script>
+<style>
+  :root {
+    --bg: #ffffff; --ink: #1d1d1f; --muted: #6e6e73; --line: #e3e3e6;
+    --soft: #f5f5f7; --accent: #0a6cff; --accent-ink: #ffffff; --code: #f0f0f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101012; --ink: #f5f5f7; --muted: #a1a1a6; --line: #2a2a2e;
+      --soft: #19191c; --accent: #3b8bff; --accent-ink: #ffffff; --code: #222226;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  .narrow { max-width: 720px; }
+  header { text-align: center; padding: 72px 0 40px; }
+  header img.icon { width: 112px; height: 112px; display: block; margin: 0 auto 20px; border-radius: 22.5%; }
+  h1 { font-size: 56px; line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 12px; font-weight: 700; }
+  .tag { font-size: 28px; line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; margin: 0 0 18px; }
+  .lede { font-size: 19px; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
+  .cta { display: inline-block; background: var(--accent); color: var(--accent-ink); font-weight: 600;
+         padding: 12px 24px; border-radius: 999px; font-size: 17px; }
+  .cta:hover { text-decoration: none; filter: brightness(1.08); }
+  .req { font-size: 14px; color: var(--muted); margin: 14px 0 0; }
+  code { font: 0.88em/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code);
+         padding: 2px 6px; border-radius: 6px; }
+  .shot { display: block; width: 100%; height: auto; border-radius: 18px; }
+  .clip { border: 1px solid var(--line); }
+  section { padding: 56px 0; }
+  section + section { border-top: 1px solid var(--line); }
+  h2 { font-size: 32px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 12px; }
+  h3 { font-size: 18px; margin: 0 0 6px; }
+  p { margin: 0 0 16px; }
+  .sub { color: var(--muted); margin-bottom: 28px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 32px; }
+  .grid p { color: var(--muted); font-size: 16px; margin: 0; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 16px; min-width: 560px; }
+  th, td { text-align: center; padding: 12px 10px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { font-size: 14px; color: var(--muted); font-weight: 600; }
+  thead th.us { color: var(--ink); }
+  td.yes { color: var(--accent); font-weight: 700; }
+  td.no { color: var(--muted); }
+  .faq h3 { margin-top: 28px; }
+  .faq p { color: var(--muted); }
+  pre { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+        overflow-x: auto; font: 14px/1.6 ui-monospace, "SF Mono", Menlo, monospace; margin: 0 0 16px; }
+  footer { border-top: 1px solid var(--line); padding: 32px 0 56px; color: var(--muted); font-size: 14px; text-align: center; }
+  @media (max-width: 760px) {
+    header { padding: 48px 0 28px; }
+    h1 { font-size: 42px; } .tag { font-size: 23px; } h2 { font-size: 26px; }
+    .grid { grid-template-columns: 1fr; gap: 22px; }
+    .wrap { padding: 0 16px; }
+    .shot { border-radius: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <img class="icon" src="assets/icon.png" alt="Grock icon" width="112" height="112">
+  <h1>Grock</h1>
+  <p class="tag">Grok, at home on your Mac.</p>
+  <p class="lede">A native Mac app for grok.com. Press ⌥Space, hand Grok a file, press Return, and get back to work. The Dock tells you when the answer is in.</p>
+  <a class="cta" href="https://github.com/jaredatch/grock/releases/latest">Download for Mac</a>
+  <p class="req">Free and open source. macOS 26 or later, Apple silicon.<br>Or <code>brew install --cask jaredatch/tap/grock</code></p>
+</header>
+
+<main>
+  <div class="wrap">
+    <img class="shot" src="assets/window.png" width="2648" height="1660" alt="The Grock window: a Finder-style sidebar with projects and chats, a native titlebar, and a Grok conversation summarizing an attached PDF">
+  </div>
+
+  <section>
+    <div class="wrap">
+      <h2>All of grok.com, plus what a tab can't do</h2>
+      <p class="sub">The conversation is grok.com itself, signed in with the account you already have. Chat, Imagine, voice, and projects work the way they do in your browser. Grock is the Mac around it.</p>
+      <div class="grid">
+        <div><h3>Quick Chat on ⌥Space</h3><p>A small card from anywhere. Type, paste, or drop in files, then press Return. Anything you copied in the last minute is already on it.</p></div>
+        <div><h3>Files from Finder and the Dock</h3><p>Drop a file on the Dock icon or the menu bar icon, use Open With, or pick Ask Grok from Finder's Services menu.</p></div>
+        <div><h3>A badge when the answer lands</h3><p>Ask something heavy and go back to work. The Dock icon gets a badge when Grok finishes, and one click takes you to the answer.</p></div>
+        <div><h3>Nothing sends on its own</h3><p>Links, scripts, and file drops only stage a prompt. You press Return.</p></div>
+        <div><h3>Styled like a Mac app</h3><p>Grock restyles grok.com toward Finder: the system font, your accent color, a real Mac sidebar. One switch gives you grok.com as it ships.</p></div>
+        <div><h3>Scriptable</h3><p>A <code>grock://</code> URL scheme and a <code>grock</code> command, so Raycast, Alfred, Shortcuts, and your shell can open a chat with text or files staged.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Quick Chat</h2>
+      <p class="sub">The card opens over whatever you're doing. Grock starts a fresh conversation, attaches the file, sends it once, and brings up the window with the answer on its way.</p>
+      <img class="shot clip" src="assets/quick-chat.gif" width="900" height="692" loading="lazy" alt="Quick Chat: a card appears over the desktop with a PDF attached, a prompt is typed, and the Grock window opens with Grok's answer">
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Grock, a browser tab, or Safari's Add to Dock</h2>
+      <p class="sub">Safari can put grok.com in its own window, and if that's all you want, it's a fine answer.</p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr><th></th><th>Browser tab</th><th>Safari Add to Dock</th><th class="us">Grock</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Its own window and Dock icon</td><td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Your grok.com account, no API key</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>A hotkey that works from any app</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>Quick Chat card with files and clipboard</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>Open With, Dock drops, Finder Services</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>URL scheme and command line tool</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>Restyled to look like a Mac app</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap narrow">
+      <h2>Install</h2>
+      <p>Download the latest ZIP from <a href="https://github.com/jaredatch/grock/releases/latest">Releases</a>, unzip it, and drag Grock to Applications. It's signed and notarized, and it updates itself after asking.</p>
+      <p>Or use Homebrew, which also links the <code>grock</code> command:</p>
+      <pre>brew install --cask jaredatch/tap/grock</pre>
+      <p>The first launch opens grok.com's own sign-in page inside the app. The <a href="https://github.com/jaredatch/grock#readme">README</a> covers the rest, including the URL scheme and the command line tool.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap narrow faq">
+      <h2>Questions</h2>
+
+      <h3>Is there a Grok app for Mac?</h3>
+      <p>As of November 2026, xAI doesn't make a Mac app for chatting on grok.com. Its Mac app, Grok Bot, is for handing work to agents. Grock is an unofficial app that puts grok.com in a Mac window, signed in with the account you already have.</p>
+
+      <h3>Is Grock official?</h3>
+      <p>No. Grock is an independent, open source project. It isn't affiliated with xAI or SpaceX. Grok is xAI's product, and Grock is a fan-made shell around it.</p>
+
+      <h3>Do I need an API key or a paid plan?</h3>
+      <p>No. Grock is free, and you sign in with an ordinary grok.com account, free or SuperGrok. Your limits are whatever your account already has.</p>
+
+      <h3>What does Grock send, and where?</h3>
+      <p>Your prompts and files go to grok.com, the same as in a browser, and only when you press Return. Grock has no server and no telemetry. The only other place it contacts is GitHub, to check for updates.</p>
+
+      <h3>Which Macs does it run on?</h3>
+      <p>macOS 26 or later on Apple silicon.</p>
+
+      <h3>What happens when grok.com changes?</h3>
+      <p>Grock rides on grok.com's page, so a redesign can break a feature until an update ships. Updates arrive inside the app. If something stops working, <a href="https://github.com/jaredatch/grock/issues/new/choose">open an issue</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><a href="https://github.com/jaredatch/grock">Source on GitHub</a> · <a href="https://github.com/jaredatch/grock/blob/master/CHANGELOG.md">Changelog</a> · <a href="https://github.com/jaredatch/grock/blob/master/LICENSE">MIT license</a></p>
+    <p>Unofficial. Grok is a product of xAI. Grock is not affiliated with xAI or SpaceX.</p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -11,6 +11,8 @@
 ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
 [![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+**[Download for Mac](https://github.com/jaredatch/grock/releases/latest)** · macOS 26 or later, Apple silicon · or `brew install --cask jaredatch/tap/grock`
+
 <img src="docs/assets/window.png" width="900" alt="The Grock window in the Mac style: a Finder-style sidebar with projects and chats, a native titlebar, and a conversation summarizing an attached PDF">
 
 </div>
@@ -19,7 +21,7 @@ Grock is a native Mac app for [grok.com](https://grok.com). It puts all of Grok 
 
 There's no API key, no Electron, and no rebuilt chat UI. The conversation is grok.com; Grock is the Mac around it.
 
-Unofficial. Not affiliated with xAI or SpaceX.
+Unofficial. Not affiliated with xAI or SpaceX. xAI makes a Mac app of its own, Grok Bot, and it does a different job: you hand it work and agents carry it out. Grock is for the chat on grok.com.
 
 ## Install
 
