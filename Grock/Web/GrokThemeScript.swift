@@ -141,6 +141,8 @@ extension WebViewStore {
     html:root #app-sidebar button[aria-keyshortcuts="Meta+J"]{background-color:transparent!important;box-shadow:none!important;margin:0!important;}
     html:root #app-sidebar footer{--grok-font-size-body:13px!important;font-size:13px!important;}
     html:root #app-sidebar footer button[data-account-action]{background-color:transparent!important;box-shadow:none!important;}
+    html:root :is([data-testid="user-message"],[data-testid="assistant-message"]){--grok-font-size-body:14px!important;--grok-line-height-body:22px!important;font-size:14px!important;line-height:22px!important;}
+    html:root [data-testid="assistant-message"] table{--grok-font-size-body:13px!important;--grok-line-height-body:20px!important;font-size:13px!important;line-height:20px!important;}
     """
 
     /// The sidebar of a window that is not in front, as Finder draws it:
