@@ -51,172 +51,257 @@
 </script>
 <style>
   :root {
-    --bg: #ffffff; --ink: #1d1d1f; --muted: #6e6e73; --line: #e3e3e6;
-    --soft: #f5f5f7; --accent: #0a6cff; --accent-ink: #ffffff; --code: #f0f0f2;
+    --paper: #eceef1; --surface: #ffffff; --ink: #14171b; --muted: #5a616b;
+    --line: #d3d8de; --blue: #0b5fd6; --key-top: #ffffff; --key-bot: #f1f3f5;
+    --key-edge: #b7bdc5; --key-line: #c8cdd4; --code: #e1e4e8;
+    --serif: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #101012; --ink: #f5f5f7; --muted: #a1a1a6; --line: #2a2a2e;
-      --soft: #19191c; --accent: #3b8bff; --accent-ink: #ffffff; --code: #222226;
+      --paper: #15171a; --surface: #1d2024; --ink: #f1f2f4; --muted: #9ba2ac;
+      --line: #2e3238; --blue: #5aa2ff; --key-top: #3a3e44; --key-bot: #2c3035;
+      --key-edge: #0c0d0f; --key-line: #4a4f57; --code: #272b30;
     }
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--blue); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 6px; }
+  code { font: 0.88em/1.4 var(--mono); background: var(--code); padding: 2px 6px; border-radius: 5px; }
+  p { margin: 0; }
+  .page { --pad: 32px; max-width: 1120px; margin: 0 auto; padding: 0 var(--pad); }
+
+  .top { display: flex; align-items: center; justify-content: space-between; padding-top: 28px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 600; font-size: 17px; }
+  .brand img { width: 30px; height: 30px; border-radius: 22.5%; display: block; }
+  .top nav { display: flex; gap: 24px; font-size: 15px; }
+  .top nav a { color: var(--muted); text-decoration: none; }
+  .top nav a:hover { color: var(--ink); }
+
+  .hero { display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); gap: 56px; align-items: center; padding-top: 72px; padding-bottom: 88px; }
+  h1 { font: 700 clamp(42px, 5.4vw, 74px)/1 var(--serif); letter-spacing: -0.025em; margin: 0 0 24px; }
+  .lede { font-size: 20px; line-height: 1.45; color: var(--muted); max-width: 30em; }
+  .keys { display: flex; align-items: center; gap: 10px; margin: 36px 0 12px; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; }
+  .key { display: flex; height: 62px; border-radius: 11px; border: 1px solid var(--key-line);
+         background: linear-gradient(var(--key-top), var(--key-bot));
+         box-shadow: 0 3px 0 var(--key-edge), 0 10px 18px -8px rgba(20, 30, 50, .35);
+         transition: transform .06s ease, box-shadow .06s ease; }
+  .key-opt { width: 74px; flex-direction: column; justify-content: space-between; align-items: flex-end; padding: 7px 9px; font-size: 12px; color: var(--muted); }
+  .key-opt b { font-size: 17px; font-weight: 400; color: var(--ink); line-height: 1; }
+  .key-space { width: 250px; }
+  .keys:active .key, .keys.down .key { transform: translateY(3px); box-shadow: 0 0 0 var(--key-edge), 0 4px 8px -6px rgba(20, 30, 50, .35); }
+  .keyhint { font-size: 15px; color: var(--muted); }
+  .get { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; margin-top: 36px; }
+  .download { display: inline-block; background: var(--ink); color: var(--paper); text-decoration: none; font-weight: 600; font-size: 17px; padding: 13px 22px; border-radius: 11px; }
+  .download:hover { background: var(--blue); color: #fff; }
+  .req { font-size: 14px; color: var(--muted); line-height: 1.45; }
+  .brew { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 14px; color: var(--muted); }
+  .brew code { background: none; padding: 0; color: var(--ink); font-size: 13px; }
+  .copy { font: 13px var(--sans); color: var(--blue); background: none; border: 0; padding: 2px 4px; cursor: pointer; }
+
+  .stage { margin: 0; }
+  .stage video { display: block; width: 100%; height: auto; aspect-ratio: 1040 / 800; border-radius: 18px; background: #2a6fc0;
+                 box-shadow: 0 0 0 1px rgba(0, 0, 0, .12), 0 30px 60px -30px rgba(15, 40, 90, .55); }
+
+  .band { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 48px; padding-top: 64px; padding-bottom: 64px; background: linear-gradient(var(--line), var(--line)) top center / calc(100% - 2 * var(--pad)) 1px no-repeat; }
+  h2 { font: 700 34px/1.08 var(--serif); letter-spacing: -0.015em; margin: 0 0 12px; }
+  .band-intro p { color: var(--muted); font-size: 16px; max-width: 22em; }
+  .adds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px 44px; margin: 0; }
+  .adds dt { font-weight: 600; margin-bottom: 4px; }
+  .adds dd { margin: 0; color: var(--muted); font-size: 16px; }
+
+  .shot { margin: 0 auto; padding-bottom: 72px; }
+  .shot img { display: block; width: 100%; height: auto; border-radius: 20px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .12); }
+  .shot figcaption { margin-top: 14px; font-size: 15px; color: var(--muted); max-width: 44em; }
+
+  .scroll { overflow-x: auto; }
+  table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 16px; }
+  th, td { padding: 13px 8px; border-bottom: 1px solid var(--line); text-align: left; font-weight: 400; }
+  thead th { font-size: 14px; color: var(--muted); vertical-align: bottom; }
+  thead th.us { color: var(--ink); font-weight: 600; }
+  tbody th { padding-left: 0; }
+  td { color: var(--muted); width: 16%; }
+  td.yes { color: var(--ink); font-weight: 600; }
+
+  .steps p + p, .steps pre + p { margin-top: 16px; }
+  pre { margin: 16px 0 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; overflow-x: auto; font: 14px/1.5 var(--mono); }
+
+  .qa { margin: 0; }
+  .qa dt { font-weight: 600; }
+  .qa dd { margin: 4px 0 26px; color: var(--muted); max-width: 40em; }
+  .qa dd:last-child { margin-bottom: 0; }
+
+  .foot { background: linear-gradient(var(--line), var(--line)) top center / calc(100% - 2 * var(--pad)) 1px no-repeat; padding-top: 28px; padding-bottom: 56px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 32px; font-size: 14px; color: var(--muted); }
+  .foot a { color: var(--muted); }
+  .foot nav { display: flex; gap: 20px; }
+
+  @media (max-width: 900px) {
+    .page { --pad: 20px; }
+    .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 48px; padding-bottom: 56px; }
+    .band { grid-template-columns: 1fr; gap: 24px; padding-top: 44px; padding-bottom: 44px; }
+    .band-intro p { max-width: none; }
+    .key-space { width: 170px; }
+    .shot { padding-bottom: 44px; }
+    .shot img { border-radius: 12px; }
   }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
-  .narrow { max-width: 720px; }
-  header { text-align: center; padding: 72px 0 40px; }
-  header img.icon { width: 112px; height: 112px; display: block; margin: 0 auto 20px; border-radius: 22.5%; }
-  h1 { font-size: 56px; line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 12px; font-weight: 700; }
-  .tag { font-size: 28px; line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; margin: 0 0 18px; }
-  .lede { font-size: 19px; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
-  .cta { display: inline-block; background: var(--accent); color: var(--accent-ink); font-weight: 600;
-         padding: 12px 24px; border-radius: 999px; font-size: 17px; }
-  .cta:hover { text-decoration: none; filter: brightness(1.08); }
-  .req { font-size: 14px; color: var(--muted); margin: 14px 0 0; }
-  code { font: 0.88em/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code);
-         padding: 2px 6px; border-radius: 6px; }
-  .shot { display: block; width: 100%; height: auto; border-radius: 18px; }
-  .clip { border: 1px solid var(--line); }
-  section { padding: 56px 0; }
-  section + section { border-top: 1px solid var(--line); }
-  h2 { font-size: 32px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 12px; }
-  h3 { font-size: 18px; margin: 0 0 6px; }
-  p { margin: 0 0 16px; }
-  .sub { color: var(--muted); margin-bottom: 28px; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 32px; }
-  .grid p { color: var(--muted); font-size: 16px; margin: 0; }
-  .tablewrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 16px; min-width: 560px; }
-  th, td { text-align: center; padding: 12px 10px; border-bottom: 1px solid var(--line); }
-  th:first-child, td:first-child { text-align: left; }
-  thead th { font-size: 14px; color: var(--muted); font-weight: 600; }
-  thead th.us { color: var(--ink); }
-  td.yes { color: var(--accent); font-weight: 700; }
-  td.no { color: var(--muted); }
-  .faq h3 { margin-top: 28px; }
-  .faq p { color: var(--muted); }
-  pre { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
-        overflow-x: auto; font: 14px/1.6 ui-monospace, "SF Mono", Menlo, monospace; margin: 0 0 16px; }
-  footer { border-top: 1px solid var(--line); padding: 32px 0 56px; color: var(--muted); font-size: 14px; text-align: center; }
-  @media (max-width: 760px) {
-    header { padding: 48px 0 28px; }
-    h1 { font-size: 42px; } .tag { font-size: 23px; } h2 { font-size: 26px; }
-    .grid { grid-template-columns: 1fr; gap: 22px; }
-    .wrap { padding: 0 16px; }
-    .shot { border-radius: 12px; }
+  @media (max-width: 560px) {
+    .adds { grid-template-columns: 1fr; gap: 22px; }
+    .top nav { gap: 16px; }
+    h2 { font-size: 28px; }
   }
+  @media (prefers-reduced-motion: reduce) { .key { transition: none; } }
 </style>
 </head>
 <body>
 
-<header class="wrap">
-  <img class="icon" src="assets/icon.png" alt="Grock icon" width="112" height="112">
-  <h1>Grock</h1>
-  <p class="tag">Grok, at home on your Mac.</p>
-  <p class="lede">A native Mac app for grok.com. Press ⌥Space, hand Grok a file, press Return, and get back to work. The Dock tells you when the answer is in.</p>
-  <a class="cta" href="https://github.com/jaredatch/grock/releases/latest">Download for Mac</a>
-  <p class="req">Free and open source. macOS 26 or later, Apple silicon.<br>Or <code>brew install --cask jaredatch/tap/grock</code></p>
+<header class="page top">
+  <a class="brand" href="https://github.com/jaredatch/grock"><img src="assets/icon.png" alt="" width="30" height="30">Grock</a>
+  <nav>
+    <a href="https://github.com/jaredatch/grock">Source</a>
+    <a href="https://github.com/jaredatch/grock/blob/master/CHANGELOG.md">Changelog</a>
+  </nav>
 </header>
 
 <main>
-  <div class="wrap">
-    <img class="shot" src="assets/window.png" width="2648" height="1660" alt="The Grock window: a Finder-style sidebar with projects and chats, a native titlebar, and a Grok conversation summarizing an attached PDF">
+  <div class="page hero">
+    <div>
+      <h1>Grok, at home<br>on your Mac.</h1>
+      <p class="lede">Grock is a native Mac app for grok.com. Press ⌥Space, hand Grok a file, press Return, and get back to work. The Dock tells you when the answer is in.</p>
+
+      <button class="keys" type="button" id="keys" aria-label="Play the Quick Chat demo">
+        <span class="key key-opt" aria-hidden="true"><b>⌥</b>option</span>
+        <span class="key key-space" aria-hidden="true"></span>
+      </button>
+      <p class="keyhint">Opens Quick Chat from any app. Press it here to watch.</p>
+
+      <div class="get">
+        <a class="download" href="https://github.com/jaredatch/grock/releases/latest">Download for Mac</a>
+        <p class="req">Free and open source.<br>macOS 26 or later, Apple silicon.</p>
+      </div>
+      <p class="brew"><code id="brew">brew install --cask jaredatch/tap/grock</code><button class="copy" type="button" id="copy">Copy</button></p>
+    </div>
+
+    <figure class="stage">
+      <video id="demo" muted playsinline preload="metadata" poster="assets/quick-chat-poster.jpg" width="1040" height="800"
+             aria-label="Quick Chat: a card appears over the desktop with a PDF attached, a prompt is typed, and the Grock window opens with Grok's answer">
+        <source src="assets/quick-chat.mp4" type="video/mp4">
+      </video>
+    </figure>
   </div>
 
-  <section>
-    <div class="wrap">
-      <h2>All of grok.com, plus what a tab can't do</h2>
-      <p class="sub">The conversation is grok.com itself, signed in with the account you already have. Chat, Imagine, voice, and projects work the way they do in your browser. Grock is the Mac around it.</p>
-      <div class="grid">
-        <div><h3>Quick Chat on ⌥Space</h3><p>A small card from anywhere. Type, paste, or drop in files, then press Return. Anything you copied in the last minute is already on it.</p></div>
-        <div><h3>Files from Finder and the Dock</h3><p>Drop a file on the Dock icon or the menu bar icon, use Open With, or pick Ask Grok from Finder's Services menu.</p></div>
-        <div><h3>A badge when the answer lands</h3><p>Ask something heavy and go back to work. The Dock icon gets a badge when Grok finishes, and one click takes you to the answer.</p></div>
-        <div><h3>Nothing sends on its own</h3><p>Links, scripts, and file drops only stage a prompt. You press Return.</p></div>
-        <div><h3>Styled like a Mac app</h3><p>Grock restyles grok.com toward Finder: the system font, your accent color, a real Mac sidebar. One switch gives you grok.com as it ships.</p></div>
-        <div><h3>Scriptable</h3><p>A <code>grock://</code> URL scheme and a <code>grock</code> command, so Raycast, Alfred, Shortcuts, and your shell can open a chat with text or files staged.</p></div>
-      </div>
+  <section class="page band">
+    <div class="band-intro">
+      <h2>What a browser tab can't do</h2>
+      <p>The conversation is grok.com itself, signed in with the account you already have. Chat, Imagine, voice, and projects work the way they do in your browser.</p>
+    </div>
+    <dl class="adds">
+      <div><dt>Quick Chat on ⌥Space</dt><dd>A small card from anywhere. Type, paste, or drop in files, then press Return. Anything you copied in the last minute is already on it.</dd></div>
+      <div><dt>Files from Finder and the Dock</dt><dd>Drop a file on the Dock icon or the menu bar icon, use Open With, or pick Ask Grok from Finder's Services menu.</dd></div>
+      <div><dt>A badge when the answer lands</dt><dd>Ask something heavy and go back to work. The Dock icon gets a badge when Grok finishes, and one click takes you to the answer.</dd></div>
+      <div><dt>Nothing sends on its own</dt><dd>Links, scripts, and file drops only stage a prompt. You press Return.</dd></div>
+      <div><dt>Hotkeys you choose</dt><dd>Quick Chat is ⌥Space out of the box. New Chat, Show Grock, and Voice Chat take any shortcut you give them. None of it needs Accessibility access.</dd></div>
+      <div><dt>A URL scheme and a command</dt><dd><code>grock://</code> links and the <code>grock</code> command let Raycast, Alfred, Shortcuts, and your shell open a chat with text or files staged.</dd></div>
+    </dl>
+  </section>
+
+  <figure class="page shot">
+    <img src="assets/window.png" width="2648" height="1660" loading="lazy" alt="The Grock window: a Finder-style sidebar with projects and chats, a native titlebar, and a Grok conversation summarizing an attached PDF">
+    <figcaption>Grock restyles grok.com toward Finder: the system font, your accent color, a sidebar that looks like a Mac sidebar. If you'd rather have grok.com exactly as it ships, Settings has a switch.</figcaption>
+  </figure>
+
+  <section class="page band">
+    <div class="band-intro">
+      <h2>Next to a tab, or Safari's Add to Dock</h2>
+      <p>Safari can put grok.com in its own window, and if that's all you want, it's a fine answer.</p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th></th><th scope="col">Browser tab</th><th scope="col">Add to Dock</th><th scope="col" class="us">Grock</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Its own window and Dock icon</th><td>No</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><th scope="row">Your grok.com account, no API key</th><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><th scope="row">A hotkey that works from any app</th><td>No</td><td>No</td><td class="yes">Yes</td></tr>
+          <tr><th scope="row">Quick Chat card with files and clipboard</th><td>No</td><td>No</td><td class="yes">Yes</td></tr>
+          <tr><th scope="row">Open With, Dock drops, Finder Services</th><td>No</td><td>No</td><td class="yes">Yes</td></tr>
+          <tr><th scope="row">URL scheme and command line tool</th><td>No</td><td>No</td><td class="yes">Yes</td></tr>
+          <tr><th scope="row">Restyled to look like a Mac app</th><td>No</td><td>No</td><td class="yes">Yes</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
-  <section>
-    <div class="wrap">
-      <h2>Quick Chat</h2>
-      <p class="sub">The card opens over whatever you're doing. Grock starts a fresh conversation, attaches the file, sends it once, and brings up the window with the answer on its way.</p>
-      <img class="shot clip" src="assets/quick-chat.gif" width="900" height="692" loading="lazy" alt="Quick Chat: a card appears over the desktop with a PDF attached, a prompt is typed, and the Grock window opens with Grok's answer">
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap">
-      <h2>Grock, a browser tab, or Safari's Add to Dock</h2>
-      <p class="sub">Safari can put grok.com in its own window, and if that's all you want, it's a fine answer.</p>
-      <div class="tablewrap">
-        <table>
-          <thead>
-            <tr><th></th><th>Browser tab</th><th>Safari Add to Dock</th><th class="us">Grock</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Its own window and Dock icon</td><td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-            <tr><td>Your grok.com account, no API key</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-            <tr><td>A hotkey that works from any app</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
-            <tr><td>Quick Chat card with files and clipboard</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
-            <tr><td>Open With, Dock drops, Finder Services</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
-            <tr><td>URL scheme and command line tool</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
-            <tr><td>Restyled to look like a Mac app</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap narrow">
+  <section class="page band">
+    <div class="band-intro">
       <h2>Install</h2>
-      <p>Download the latest ZIP from <a href="https://github.com/jaredatch/grock/releases/latest">Releases</a>, unzip it, and drag Grock to Applications. It's signed and notarized, and it updates itself after asking.</p>
+    </div>
+    <div class="steps">
+      <p>Download the latest ZIP from <a href="https://github.com/jaredatch/grock/releases/latest">Releases</a>, unzip it, and drag Grock to Applications. It's signed and notarized, and it asks before installing an update.</p>
       <p>Or use Homebrew, which also links the <code>grock</code> command:</p>
       <pre>brew install --cask jaredatch/tap/grock</pre>
       <p>The first launch opens grok.com's own sign-in page inside the app. The <a href="https://github.com/jaredatch/grock#readme">README</a> covers the rest, including the URL scheme and the command line tool.</p>
     </div>
   </section>
 
-  <section>
-    <div class="wrap narrow faq">
+  <section class="page band">
+    <div class="band-intro">
       <h2>Questions</h2>
-
-      <h3>Is there a Grok app for Mac?</h3>
-      <p>As of November 2026, xAI doesn't make a Mac app for chatting on grok.com. Its Mac app, Grok Bot, is for handing work to agents. Grock is an unofficial app that puts grok.com in a Mac window, signed in with the account you already have.</p>
-
-      <h3>Is Grock official?</h3>
-      <p>No. Grock is an independent, open source project. It isn't affiliated with xAI or SpaceX. Grok is xAI's product, and Grock is a fan-made shell around it.</p>
-
-      <h3>Do I need an API key or a paid plan?</h3>
-      <p>No. Grock is free, and you sign in with an ordinary grok.com account, free or SuperGrok. Your limits are whatever your account already has.</p>
-
-      <h3>What does Grock send, and where?</h3>
-      <p>Your prompts and files go to grok.com, the same as in a browser, and only when you press Return. Grock has no server and no telemetry. The only other place it contacts is GitHub, to check for updates.</p>
-
-      <h3>Which Macs does it run on?</h3>
-      <p>macOS 26 or later on Apple silicon.</p>
-
-      <h3>What happens when grok.com changes?</h3>
-      <p>Grock rides on grok.com's page, so a redesign can break a feature until an update ships. Updates arrive inside the app. If something stops working, <a href="https://github.com/jaredatch/grock/issues/new/choose">open an issue</a>.</p>
     </div>
+    <dl class="qa">
+      <dt>Is there a Grok app for Mac?</dt>
+      <dd>As of November 2026, xAI doesn't make a Mac app for chatting on grok.com. Its Mac app, Grok Bot, is for handing work to agents. Grock is an unofficial app that puts grok.com in a Mac window, signed in with the account you already have.</dd>
+      <dt>Is Grock official?</dt>
+      <dd>No. Grock is an independent, open source project. It isn't affiliated with xAI or SpaceX. Grok is xAI's product, and Grock is a fan-made shell around it.</dd>
+      <dt>Do I need an API key or a paid plan?</dt>
+      <dd>No. Grock is free, and you sign in with an ordinary grok.com account, free or SuperGrok. Your limits are whatever your account already has.</dd>
+      <dt>What does Grock send, and where?</dt>
+      <dd>Your prompts and files go to grok.com, the same as in a browser, and only when you press Return. Grock has no server and no telemetry. The only other place it contacts is GitHub, to check for updates.</dd>
+      <dt>Which Macs does it run on?</dt>
+      <dd>macOS 26 or later on Apple silicon.</dd>
+      <dt>What happens when grok.com changes?</dt>
+      <dd>Grock rides on grok.com's page, so a redesign can break a feature until an update ships. Updates arrive inside the app. If something stops working, <a href="https://github.com/jaredatch/grock/issues/new/choose">open an issue</a>.</dd>
+    </dl>
   </section>
 </main>
 
-<footer>
-  <div class="wrap">
-    <p><a href="https://github.com/jaredatch/grock">Source on GitHub</a> · <a href="https://github.com/jaredatch/grock/blob/master/CHANGELOG.md">Changelog</a> · <a href="https://github.com/jaredatch/grock/blob/master/LICENSE">MIT license</a></p>
-    <p>Unofficial. Grok is a product of xAI. Grock is not affiliated with xAI or SpaceX.</p>
-  </div>
+<footer class="page foot">
+  <p>Unofficial. Grok is a product of xAI. Grock is not affiliated with xAI or SpaceX.</p>
+  <nav>
+    <a href="https://github.com/jaredatch/grock">Source</a>
+    <a href="https://github.com/jaredatch/grock/blob/master/CHANGELOG.md">Changelog</a>
+    <a href="https://github.com/jaredatch/grock/blob/master/LICENSE">MIT license</a>
+  </nav>
 </footer>
+
+<script>
+(function () {
+  var demo = document.getElementById('demo');
+  var keys = document.getElementById('keys');
+  var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function play() { try { demo.currentTime = 0; demo.play(); } catch (e) {} }
+  keys.addEventListener('click', play);
+  demo.addEventListener('click', play);
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey && e.code === 'Space' && !e.repeat) { e.preventDefault(); keys.classList.add('down'); play(); }
+  });
+  document.addEventListener('keyup', function () { keys.classList.remove('down'); });
+  if (!still) { demo.addEventListener('loadeddata', function once() { demo.removeEventListener('loadeddata', once); demo.play().catch(function () {}); }); demo.load(); }
+
+  var copy = document.getElementById('copy');
+  copy.addEventListener('click', function () {
+    var text = document.getElementById('brew').textContent;
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(function () {
+      copy.textContent = 'Copied';
+      setTimeout(function () { copy.textContent = 'Copy'; }, 1600);
+    });
+  });
+})();
+</script>
 
 </body>
 </html>
