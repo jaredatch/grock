@@ -125,7 +125,7 @@ struct GeneralSettingsPane: View {
 
 struct AppearanceSettingsPane: View {
     @AppStorage(AppearancePreference.defaultsKey) private var appearanceRaw = AppearancePreference.system.rawValue
-    @AppStorage(PageStyle.defaultsKey) private var pageStyleRaw = PageStyle.grok.rawValue
+    @AppStorage(PageStyle.defaultsKey) private var pageStyleRaw = PageStyle.fallback.rawValue
     @AppStorage(ChromePreference.hideSidebarOnLaunchKey) private var hideSidebarOnLaunch = true
     @AppStorage(ChromePreference.hideImagineKey) private var hideImagine = false
     @AppStorage(ChromePreference.hideLibraryKey) private var hideLibrary = false
@@ -159,7 +159,7 @@ struct AppearanceSettingsPane: View {
                 .pickerStyle(.segmented)
                 .onChange(of: pageStyleRaw) { _, _ in PageStyle.apply() }
             } footer: {
-                Text("Grok is grok.com as it ships. Mac restyles it to sit closer to a Mac app. Experimental.")
+                Text("Mac restyles grok.com to sit closer to a Mac app. Grok is the page as it ships.")
             }
 
             Section {

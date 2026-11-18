@@ -211,9 +211,9 @@ Signed out, there's one thing to do, so the page shows only Sign in. Grock hides
 
 Cost: Sign up isn't on the page any more, though grok.com's Log in window still links to it. If you start signing in and change your mind, New Chat in the title menu is the way back. Only the X path has been run as far as its login page; Apple, Google, and GitHub follow the same rule but haven't been tried.
 
-## DEC-073. An optional Mac style
+## DEC-073. The Mac style
 
-grok.com's November design is warmer and more its own thing than the neutral page Grock started on: cream fills, a brown tint in every hover, its own typeface, 40px sidebar rows. Inside a Mac window it reads as a website. Appearance → Style now has a second choice, Mac, that restyles the page to sit closer to Finder. Grok, the page as it ships, stays the default while the Mac style is experimental.
+grok.com's November design is warmer and more its own thing than the neutral page Grock started on: cream fills, a brown tint in every hover, its own typeface, 40px sidebar rows. Inside a Mac window it reads as a website. Appearance → Style now has a second choice, Mac, that restyles the page to sit closer to Finder. It first shipped behind Grok, the page as it ships, and is now the default. A copy with no saved choice gets Mac; anyone who picked a style keeps it, and Grok is one click away.
 
 grok.com paints from a few dozen CSS custom properties: an ink color, a wash that tints every fill, two surfaces, an accent, three font stacks, some sizes. The Mac style overrides those and adds a short list of rules for the sidebar, menus, and switches. Those rules match ids, roles, and `data-` attributes, as the chrome script does (DEC-071). All of it lives in `GrokThemeScript.swift`.
 

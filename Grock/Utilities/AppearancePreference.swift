@@ -86,6 +86,8 @@ enum PageStyle: String, CaseIterable, Identifiable {
     case mac
 
     static let defaultsKey = "app.pageStyle"
+    /// What a copy with no saved choice gets (DEC-073).
+    static let fallback = PageStyle.mac
 
     var id: String { rawValue }
 
@@ -104,7 +106,7 @@ enum PageStyle: String, CaseIterable, Identifiable {
            let value = PageStyle(rawValue: raw) {
             return value
         }
-        return .grok
+        return fallback
     }
 
     static func setCurrent(_ value: PageStyle) {

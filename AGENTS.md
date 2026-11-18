@@ -62,7 +62,7 @@ Swift 5.10, Xcode 26 (macOS 26 SDK), macOS 26 or later, Apple silicon, XcodeGen 
 - `grock://` (show), `grock://new`, `grock://new?text=`, `grock://ask?text=`, `grock://imagine?generate=`, plus repeatable `file=` and `bookmark=` on `new` and `ask`. The `grock` CLI wraps those URLs and lives inside the app bundle.
 - Files handed over by the OS (Dock, Open With, `open -a`, status item drop) land on Quick Chat. Finder → Services → Ask Grok lands on a New Chat in the overlay. Drops on the open window attach in grok.com.
 - Unread answer badges the Dock. Showing the window scrolls to that answer.
-- Style is Grok (grok.com as it ships) by default. Mac restyles the page toward Finder and is experimental (DEC-073).
+- Style is Mac by default: the page restyled toward Finder. Grok is grok.com as it ships (DEC-073).
 - Settings: General (hotkeys, clipboard capture, Dock, login), Appearance (theme, style, hide grok.com chrome), Account (open the current page in a browser, clear web data), Advanced (Web Inspector, CLI install, reset).
 
 ## Patterns to follow

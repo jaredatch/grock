@@ -297,7 +297,7 @@ final class GrockTests: XCTestCase {
                 defaults.removeObject(forKey: PageStyle.defaultsKey)
             }
         }
-        defaults.removeObject(forKey: PageStyle.defaultsKey)
+        defaults.set(PageStyle.grok.rawValue, forKey: PageStyle.defaultsKey)
         func backdrop(_ name: NSAppearance.Name) throws -> [Int] {
             var resolved: NSColor?
             try XCTUnwrap(NSAppearance(named: name)).performAsCurrentDrawingAppearance {
@@ -421,7 +421,7 @@ final class GrockTests: XCTestCase {
         SettingsReset.restorePreferenceDefaults()
 
         XCTAssertEqual(AppearancePreference.current, .system)
-        XCTAssertEqual(PageStyle.current, .grok)
+        XCTAssertEqual(PageStyle.current, .mac)
         XCTAssertTrue(ChromePreference.current.collapseSidebar)
         XCTAssertTrue(ChromePreference.current.sidebarHidden)
         XCTAssertTrue(ChromePreference.current.hideGrokBot)
