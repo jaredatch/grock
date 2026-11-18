@@ -3,6 +3,16 @@
     <channel>
         <title>Grock</title>
         <item>
+            <title>1.1.0</title>
+            <pubDate>Wed, 18 Nov 2026 18:52:24 +0000</pubDate>
+            <link>https://github.com/jaredatch/grock</link>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/jaredatch/grock/releases/download/v1.1.0/Grock-1.1.0-arm64.zip" length="3256979" type="application/octet-stream" sparkle:edSignature="sFV1cyeW0EOQCW2oLWtDSIMHqTjAGfMumvM4Y7d+O5n9U4c91L/OS9U0NKrhzGwAKPk8FzCOHouVIp3KO8H6Bw=="/>
+        </item>
+        <item>
             <title>1.0.3</title>
             <pubDate>Wed, 11 Nov 2026 20:14:56 +0000</pubDate>
             <link>https://github.com/jaredatch/grock</link>
@@ -21,16 +31,6 @@
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/jaredatch/grock/releases/download/v1.0.2/Grock-1.0.2-arm64.zip" length="3237246" type="application/octet-stream" sparkle:edSignature="/VRrBtKkYVYkmpfeM715EABnswPt50c7TNYN9pg+ZsVIui8djsp+AhD0y1vXJ5OfrCG4j2yyw0bKGNYChiSYAw=="/>
-        </item>
-        <item>
-            <title>1.0.1</title>
-            <pubDate>Wed, 04 Nov 2026 19:14:54 +0000</pubDate>
-            <link>https://github.com/jaredatch/grock</link>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/jaredatch/grock/releases/download/v1.0.1/Grock-1.0.1-arm64.zip" length="3237048" type="application/octet-stream" sparkle:edSignature="Y/i14nNeIMlWObDiFPf5n8FjHeCeojy034Li9Ny3usY0aowD66mrQhr8NQx2Cu+IMnIKU0CHcJB6lGzlEKlZBA=="/>
         </item>
     </channel>
 </rss>
