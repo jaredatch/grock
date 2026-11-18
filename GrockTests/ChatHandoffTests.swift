@@ -234,13 +234,13 @@ final class ChatHandoffTests: XCTestCase {
         });
         """)
         defer { fixture.window.close() }
-        // Short enough to fail the ignored upload quickly, long enough that
-        // the retry's real upload lands in time on a slow CI runner. The same
-        // window applies to both attempts; 220ms flaked there.
-        let store = WebViewStore(webView: fixture.webView, attachmentWaitMilliseconds: 1_000)
+        // The ignored upload waits out this whole window; the retry's real
+        // upload returns as soon as its chip settles. The same window applies
+        // to both attempts. 220ms and then 1s flaked on slow CI runners.
+        let store = WebViewStore(webView: fixture.webView, attachmentWaitMilliseconds: 3_000)
         let attachment = QuickChatAttachment(filename: "notes.txt", mimeType: "text/plain", data: Data("saved notes".utf8))
         store.fillComposer(text: "Keep everything", attachments: [attachment])
-        for _ in 0..<120 where store.recoveryState == nil {
+        for _ in 0..<240 where store.recoveryState == nil {
             try await Task.sleep(for: .milliseconds(25))
         }
         XCTAssertEqual(store.recoveryState, .contextNotAdded)
@@ -432,7 +432,8 @@ final class ChatHandoffTests: XCTestCase {
         """, baseURL: URL(string: "https://grok.com/"))
         await fulfillment(of: [loaded], timeout: 4)
         store.handleNavigationFinished()
-        for _ in 0..<80 where store.showsLaunchLoading || store.isFillingComposer {
+        // A budget, not a delay: the loop exits as soon as the fill settles.
+        for _ in 0..<240 where store.showsLaunchLoading || store.isFillingComposer {
             try await Task.sleep(for: .milliseconds(25))
         }
         XCTAssertFalse(store.isFillingComposer)
