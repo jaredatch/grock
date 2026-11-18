@@ -4,6 +4,7 @@
 
 - A chat scrolled under the titlebar fades out properly again. Since 1.0.3 the text stayed half visible behind the title and buttons.
 - Appearance has a new Style setting. Mac restyles grok.com to sit closer to Finder: neutral colors, the system font, your accent color, and a Finder-style sidebar. It's experimental, and Grok, the page as it ships, stays the default.
+- Opening the sidebar widens the window so the chat keeps its room, and closing it narrows the window again. A window you've resized yourself is left alone.
 - In the Mac style, sidebar rows highlight under the pointer, Show more reads as the end of its group, the spacing between groups matches Finder, and the sidebar dims when the window isn't in front.
 
 ## 1.0.3 (2026-11-11)

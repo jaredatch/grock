@@ -438,6 +438,42 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(PanelGeometry.minContentSize, NSSize(width: 720, height: 520))
     }
 
+    func testSidebarToggleMovesBetweenDefaultWidths() {
+        let screens = [NSRect(x: 0, y: 0, width: 1440, height: 900)]
+        let closed = NSRect(x: 400, y: 100, width: 920, height: 680)
+        let open = PanelGeometry.sidebarToggleFrame(current: closed, sidebarOpen: true, visibleScreens: screens)
+        // Grows on the left, so the chat's right edge does not move.
+        XCTAssertEqual(open, NSRect(x: 146, y: 100, width: 1174, height: 680))
+        XCTAssertEqual(open.maxX, closed.maxX)
+        XCTAssertEqual(
+            PanelGeometry.sidebarToggleFrame(current: open, sidebarOpen: false, visibleScreens: screens),
+            closed
+        )
+        XCTAssertEqual(PanelGeometry.defaultContentSize(sidebarOpen: true).width, open.width)
+        XCTAssertEqual(PanelGeometry.defaultContentSize(sidebarOpen: false), PanelGeometry.defaultContentSize)
+    }
+
+    func testSidebarToggleLeavesUserSizedWindowAlone() {
+        let screens = [NSRect(x: 0, y: 0, width: 1440, height: 900)]
+        let sized = NSRect(x: 200, y: 100, width: 1000, height: 680)
+        XCTAssertEqual(PanelGeometry.sidebarToggleFrame(current: sized, sidebarOpen: true, visibleScreens: screens), sized)
+        XCTAssertEqual(PanelGeometry.sidebarToggleFrame(current: sized, sidebarOpen: false, visibleScreens: screens), sized)
+    }
+
+    func testSidebarToggleStaysOnScreen() {
+        let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        // Too close to the left edge: the rest of the growth goes right.
+        let nearEdge = NSRect(x: 100, y: 100, width: 920, height: 680)
+        XCTAssertEqual(
+            PanelGeometry.sidebarToggleFrame(current: nearEdge, sidebarOpen: true, visibleScreens: [screen]),
+            NSRect(x: 0, y: 100, width: 1174, height: 680)
+        )
+        // A screen narrower than the open default keeps the window as is.
+        let small = NSRect(x: 0, y: 0, width: 1100, height: 700)
+        let frame = NSRect(x: 90, y: 10, width: 920, height: 680)
+        XCTAssertEqual(PanelGeometry.sidebarToggleFrame(current: frame, sidebarOpen: true, visibleScreens: [small]), frame)
+    }
+
     func testPanelGeometryKeepsOnscreenFrame() {
         let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
         let frame = NSRect(x: 100, y: 80, width: 920, height: 680)
@@ -2814,6 +2850,30 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(tops["viewer"] as? Double), 52, accuracy: 0.5)
         XCTAssertEqual(try XCTUnwrap(tops["close"] as? Double), 64, accuracy: 0.5)
         XCTAssertEqual(try XCTUnwrap(tops["other"] as? Double), 0, accuracy: 0.5)
+    }
+
+    /// A toggle that resizes the window waits for the resize, so the sidebar
+    /// and the new width land in one layout (DEC-074).
+    @MainActor
+    func testSidebarToggleWaitsForWindowResize() async throws {
+        let html = GrokShellFixture.page(content: GrokShellFixture.hero)
+        let webView = try await loadSessionFixture(html: html, url: "https://grok.com/")
+        let result = try await callSessionJavaScript(webView, """
+          function hidden() { return document.documentElement.hasAttribute('data-grock-sidebar-hidden'); }
+          window.__grockChrome.set({ sidebarHidden: true });
+          var start = hidden();
+          window.__grockChrome.set({ sidebarHidden: false }, { withResize: true });
+          var held = hidden();
+          window.dispatchEvent(new Event('resize'));
+          var afterResize = hidden();
+          window.__grockChrome.set({ sidebarHidden: true }, { withResize: true });
+          var heldOpen = hidden();
+          await new Promise(function (done) { setTimeout(done, 400); });
+          return { start: start, held: held, afterResize: afterResize, heldOpen: heldOpen, afterTimeout: hidden() };
+        """) as? [String: Bool]
+        XCTAssertEqual(result, [
+            "start": true, "held": true, "afterResize": false, "heldOpen": false, "afterTimeout": true
+        ])
     }
 
     /// grok.com's sidebar is open or collapsed to nothing. When the titlebar

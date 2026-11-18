@@ -226,3 +226,15 @@ What it changes:
 - Menus on a blurred backdrop, with the highlighted item in the accent color. Accent switches and default buttons. An arrow cursor over controls.
 
 Cost: this rides on grok.com's property names, so a redesign will undo it. It fails soft, back to grok.com's own look, though a partial rename could leave a mixed one for a release. The glyphs are still grok.com's and thinner than Apple's. The see-through sidebar needs the WebView not to paint its own background, and macOS has no public switch for that, so Grock sets the `drawsBackground` key WebKit has long answered to and checks that it's still there first. If it goes away, the sidebar falls back to plain gray.
+
+## DEC-074. The window widens for the sidebar
+
+The default window is 920pt wide, sized for a chat with the sidebar hidden. grok.com's sidebar takes 254pt of that when it opens, and the chat that's left feels cramped. A wider default would only split the difference, and it would loosen the launcher case most people see.
+
+So there are two default widths: 920 with the sidebar hidden and 1174 with it open, the 254pt the sidebar takes. Toggling the sidebar moves the window between them, growing and shrinking on the left so the chat doesn't move on screen. This only happens when the window is at one of those two widths. Once you resize it, the size is yours and the toggle leaves it alone. A screen too narrow for the open width is left alone too.
+
+The resize isn't animated, and the page waits for it. The page holds the sidebar change until the window's resize event arrives, so the sidebar and the new width land in one layout. Without that, closing laid the chat out once at the narrow width with the sidebar still there, then again without it.
+
+Closing also needs a cover. The window shrinks before the page can redraw, and until it does WebKit shows its old picture in the smaller window, sidebar included. So Grock takes a snapshot of the chat, lays it over the web view, shrinks the window, and removes it once the page has painted. Opening has the mirror problem, the old picture of the chat drawn a sidebar's width out of place, and a different fix: under the same kind of snapshot the web view widens past the window's left edge, the page draws the sidebar there out of sight, and then the window grows over a web view that's already the right size.
+
+Cost: Mac windows don't usually resize themselves, and Notes and Mail squeeze their content instead. The match is exact, so a window dragged one point off the default stops following the sidebar. Turning on Hide Sidebar on Launch in Settings closes the sidebar without narrowing the window until the next launch.

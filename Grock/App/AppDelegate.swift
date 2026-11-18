@@ -336,7 +336,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let panel = FloatingPanel()
         panel.delegate = self
         panel.installWebView(WebViewStore.shared.webView)
-        if !restoreFrame(panel) {
+        if restoreFrame(panel) {
+            // Hide Sidebar on Launch may have closed a sidebar the saved
+            // frame was widened for.
+            panel.fitWidthToSidebar()
+        } else {
             applyDefaultPanelFrame(panel)
         }
         self.panel = panel
@@ -663,7 +667,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func applyDefaultPanelFrame(_ window: NSWindow) {
-        window.setContentSize(PanelGeometry.defaultContentSize)
+        window.setContentSize(
+            PanelGeometry.defaultContentSize(sidebarOpen: !ChromePreference.current.sidebarHidden)
+        )
         window.center()
         window.setFrame(
             PanelGeometry.constrainedFrame(

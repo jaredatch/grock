@@ -229,22 +229,26 @@ enum ChromePreference {
         _ value: Snapshot = current,
         collapse: Bool = false,
         forceCollapse: Bool = false,
-        expand: Bool = false
+        expand: Bool = false,
+        thenResize: (@MainActor () -> Void)? = nil
     ) {
         Task { @MainActor in
             WebViewStore.shared.applyChrome(
                 value,
                 collapse: collapse,
                 forceCollapse: forceCollapse,
-                expand: expand
+                expand: expand,
+                thenResize: thenResize
             )
             NotificationCenter.default.post(name: .grockChromeDidChange, object: nil)
         }
     }
 
-    static func setSidebarHidden(_ hidden: Bool) {
+    /// `thenResize` runs once the page has the change and is waiting for the
+    /// window to resize with it (DEC-074).
+    static func setSidebarHidden(_ hidden: Bool, thenResize: (@MainActor () -> Void)? = nil) {
         UserDefaults.standard.set(hidden, forKey: sidebarHiddenKey)
-        apply(current, expand: !hidden)
+        apply(current, expand: !hidden, thenResize: thenResize)
     }
 
     /// Titlebar show/hide persists. If Hide Sidebar on Launch is on, that

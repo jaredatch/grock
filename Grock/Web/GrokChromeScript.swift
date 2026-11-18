@@ -766,7 +766,7 @@ extension WebViewStore {
         // Open grok.com's sidebar while it is still hidden here, so showing
         // it does not flash an empty column first.
         keepSidebarExpanded();
-        setRootFlag('data-grock-sidebar-hidden', config.sidebarHidden);
+        if (sidebarHold === null) setRootFlag('data-grock-sidebar-hidden', config.sidebarHidden);
         setRootFlag('data-grock-page-header-hidden', shouldHidePageHeader());
         ensureStyle();
         if (full) clearMarks();
@@ -776,9 +776,27 @@ extension WebViewStore {
         postSessionState();
       }
 
-      function apply(next) {
+      // A sidebar toggle that also resizes the window (DEC-074) waits for
+      // the resize, so the sidebar and the new width land in one layout.
+      // Otherwise the chat is laid out at a width it never keeps.
+      var sidebarHold = null;
+      function releaseSidebarHold() {
+        if (sidebarHold === null) return;
+        clearTimeout(sidebarHold);
+        sidebarHold = null;
+        window.removeEventListener('resize', releaseSidebarHold);
+        setRootFlag('data-grock-sidebar-hidden', config.sidebarHidden);
+      }
+      function holdSidebarForResize() {
+        if (sidebarHold === null) window.addEventListener('resize', releaseSidebarHold);
+        else clearTimeout(sidebarHold);
+        sidebarHold = setTimeout(releaseSidebarHold, 250);
+      }
+
+      function apply(next, options) {
         merge(window.__grockChromeConfig);
         merge(next);
+        if (options && options.withResize) holdSidebarForResize();
         paint(true);
       }
 

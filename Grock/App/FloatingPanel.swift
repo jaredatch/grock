@@ -11,9 +11,49 @@ enum PanelGeometry {
     /// the native sidebar toggle on its trailing edge (Notes / Mail). The
     /// page's resize handle is muted so the two stay lined up.
     static let grokSidebarWidth: CGFloat = 256
+    /// The width the sidebar takes from the page's layout, unrounded. The
+    /// window grows by exactly this, so the chat does not move (DEC-074).
+    static let grokSidebarLayoutWidth: CGFloat = 254
     /// Gap between the open rail and the first content-column title. Matches
     /// the usual Tahoe spacing between two titlebar capsules.
     static let appSwitchRailGap: CGFloat = 8
+
+    /// Default size for the sidebar state. Open adds the sidebar's width so
+    /// the chat column is the same either way (DEC-074).
+    static func defaultContentSize(sidebarOpen: Bool) -> NSSize {
+        var size = defaultContentSize
+        if sidebarOpen { size.width += grokSidebarLayoutWidth }
+        return size
+    }
+
+    /// Frame after a sidebar toggle (DEC-074). A window at the default width
+    /// for the other state moves to the default for this one, growing or
+    /// shrinking on the left so the chat stays put. Any other width is the
+    /// user's and is left alone, as is a screen too narrow for the open size.
+    static func sidebarToggleFrame(
+        current: NSRect,
+        sidebarOpen: Bool,
+        visibleScreens: [NSRect]
+    ) -> NSRect {
+        let closedWidth = defaultContentSize.width
+        let openWidth = closedWidth + grokSidebarLayoutWidth
+        var f = current
+        if sidebarOpen {
+            guard abs(current.width - closedWidth) < 0.5,
+                  let screen = pickScreen(for: current, in: visibleScreens),
+                  screen.width >= openWidth
+            else { return current }
+            f.size.width = openWidth
+            f.origin.x = current.minX - grokSidebarLayoutWidth
+            // No room on the left: grow to the right for the remainder.
+            if f.minX < screen.minX { f.origin.x = min(current.minX, screen.minX) }
+        } else {
+            guard abs(current.width - openWidth) < 0.5 else { return current }
+            f.size.width = closedWidth
+            f.origin.x = current.minX + grokSidebarLayoutWidth
+        }
+        return f
+    }
 
     /// Unified titlebar height. `fullSizeContentView` can report a zero
     /// layout rect before the window is on screen; treat that as unknown.
@@ -343,6 +383,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
     private var copiedTitleRestore: DispatchWorkItem?
     private var titlebarDragHeight: NSLayoutConstraint?
     private var webViewTop: NSLayoutConstraint?
+    private var webViewLeading: NSLayoutConstraint?
     private var showingAuthPage = false
     private weak var sidebarButton: SidebarRailButton?
     private var sidebarButtonTrailing: NSLayoutConstraint?
@@ -353,6 +394,7 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
     private var recoveryView: WebRecoveryView?
     private var downloadStatus: DownloadStatusView?
     private var sidebarMaterialView: NSGlassEffectView?
+    private var sidebarTogglePending = false
     private var downloadStatusHeight: NSLayoutConstraint?
     private var feedbackObservers: [NSObjectProtocol] = []
 
@@ -922,8 +964,164 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
 
     @objc private func toolbarToggleSidebar() {
         guard WebViewStore.shared.isSignedIn else { return }
-        ChromePreference.setSidebarHidden(!ChromePreference.current.sidebarHidden)
-        syncToolbar()
+        guard !sidebarTogglePending else { return }
+        let hidden = !ChromePreference.current.sidebarHidden
+        guard let next = sidebarFitFrame(sidebarOpen: !hidden) else {
+            ChromePreference.setSidebarHidden(hidden)
+            syncToolbar()
+            return
+        }
+        if hidden {
+            closeSidebarBehindCover(to: next)
+        } else {
+            openSidebarBehindCover(to: next)
+        }
+    }
+
+    /// Opening grows the window before the page can redraw, and for a moment
+    /// WebKit shows its old picture at the new left edge: the chat, a
+    /// sidebar's width out of place. So the page draws the sidebar first,
+    /// out of sight. The web view widens past the window's left edge under a
+    /// snapshot of the chat, and once the page has painted, the window grows
+    /// over a web view that is already the right size (DEC-074).
+    private func openSidebarBehindCover(to next: NSRect) {
+        let web = WebViewStore.shared.webView
+        let inset = next.width - frame.width
+        let plain = { [weak self] in
+            self?.sidebarTogglePending = false
+            // The page holds the sidebar until the resize reaches it, so the
+            // chat is never laid out at a width it does not keep.
+            ChromePreference.setSidebarHidden(false) { [weak self] in
+                self?.setFrame(next, display: true)
+            }
+            self?.syncToolbar()
+        }
+        guard web.window === self, let host = web.superview, let leading = webViewLeading else {
+            plain()
+            return
+        }
+        let config = WKSnapshotConfiguration()
+        config.afterScreenUpdates = false
+        sidebarTogglePending = true
+        web.takeSnapshot(with: config) { [weak self] image, _ in
+            MainActor.assumeIsolated {
+                guard let self, let image, web.superview === host else {
+                    plain()
+                    return
+                }
+                let cover = NSImageView(frame: web.frame)
+                cover.image = image
+                cover.imageScaling = .scaleNone
+                cover.imageAlignment = .alignTopLeft
+                host.addSubview(cover, positioned: .above, relativeTo: web)
+                // The page only. The preference and the toolbar follow when
+                // the window grows, so the title does not move early.
+                var shown = ChromePreference.current
+                shown.sidebarHidden = false
+                WebViewStore.shared.applyChrome(shown, expand: true) { [weak self] in
+                    leading.constant = -inset
+                    host.layoutSubtreeIfNeeded()
+                    self?.whenPainted(web) { [weak self] in
+                        ChromePreference.setSidebarHidden(false)
+                        leading.constant = 0
+                        self?.setFrame(next, display: true)
+                        cover.removeFromSuperview()
+                        self?.sidebarTogglePending = false
+                        self?.syncToolbar()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Closing shrinks the window before the page can redraw, and for a
+    /// moment WebKit shows its old picture in the smaller window: the
+    /// sidebar, still there. A snapshot of the chat sits over the web view
+    /// until the page has painted without the sidebar (DEC-074).
+    private func closeSidebarBehindCover(to next: NSRect) {
+        let web = WebViewStore.shared.webView
+        let inset = frame.width - next.width
+        let close: (NSView?) -> Void = { [weak self] cover in
+            guard let self else { return }
+            self.sidebarTogglePending = false
+            ChromePreference.setSidebarHidden(true) { [weak self] in
+                self?.setFrame(next, display: true)
+                self?.removeSidebarCover(cover, whenPainted: web)
+            }
+            self.syncToolbar()
+        }
+        guard web.window === self, let host = web.superview, web.bounds.width > inset else {
+            close(nil)
+            return
+        }
+        let config = WKSnapshotConfiguration()
+        config.rect = NSRect(x: inset, y: 0, width: web.bounds.width - inset, height: web.bounds.height)
+        config.afterScreenUpdates = false
+        sidebarTogglePending = true
+        web.takeSnapshot(with: config) { image, _ in
+            MainActor.assumeIsolated {
+                guard let image, web.superview === host else {
+                    close(nil)
+                    return
+                }
+                let cover = NSImageView(frame: NSRect(
+                    x: web.frame.minX + inset,
+                    y: web.frame.minY,
+                    width: web.frame.width - inset,
+                    height: web.frame.height
+                ))
+                cover.image = image
+                cover.imageScaling = .scaleNone
+                cover.imageAlignment = .alignTopLeft
+                // Stays on the right edge while the window shrinks on the left.
+                cover.autoresizingMask = [.minXMargin]
+                host.addSubview(cover, positioned: .above, relativeTo: web)
+                close(cover)
+            }
+        }
+    }
+
+    private func removeSidebarCover(_ cover: NSView?, whenPainted web: WKWebView) {
+        guard let cover else { return }
+        whenPainted(web) { cover.removeFromSuperview() }
+    }
+
+    /// Runs `then` once, after the page has painted its next layout.
+    private func whenPainted(_ web: WKWebView, then: @escaping @MainActor () -> Void) {
+        var done = false
+        let finish: @MainActor () -> Void = {
+            guard !done else { return }
+            done = true
+            then()
+        }
+        web.callAsyncJavaScript(
+            "await new Promise(function (done) { requestAnimationFrame(function () { requestAnimationFrame(done); }); });",
+            arguments: [:], in: nil, in: .page
+        ) { _ in
+            // One more beat for the painted frame to reach the window.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { MainActor.assumeIsolated(finish) }
+        }
+        // An occluded page gets no animation frames. Do not wait on it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { MainActor.assumeIsolated(finish) }
+    }
+
+    /// The frame a sidebar toggle should move to, or nil to stay put.
+    private func sidebarFitFrame(sidebarOpen: Bool) -> NSRect? {
+        guard !styleMask.contains(.fullScreen) else { return nil }
+        let next = PanelGeometry.sidebarToggleFrame(
+            current: frame,
+            sidebarOpen: sidebarOpen,
+            visibleScreens: NSScreen.screens.map(\.visibleFrame)
+        )
+        return next == frame ? nil : next
+    }
+
+    /// Move between the two default widths when the sidebar state changes
+    /// (DEC-074). Does nothing for a window the user has sized. Not animated:
+    /// the page lags an animated resize and shows a blank strip.
+    func fitWidthToSidebar() {
+        guard let next = sidebarFitFrame(sidebarOpen: !ChromePreference.current.sidebarHidden) else { return }
+        setFrame(next, display: true)
     }
 
     @objc private func toolbarNewChat() {
@@ -1155,8 +1353,10 @@ final class FloatingPanel: NSPanel, NSToolbarDelegate, NSMenuDelegate {
         let webTop = webView.topAnchor.constraint(equalTo: host.topAnchor)
         webViewTop = webTop
         showingAuthPage = NavigationPolicy.isSignInHost(webView.url?.host)
+        let webLeading = webView.leadingAnchor.constraint(equalTo: host.leadingAnchor)
+        webViewLeading = webLeading
         NSLayoutConstraint.activate([
-            webView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            webLeading,
             webView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
             webTop,
             webView.bottomAnchor.constraint(equalTo: status.topAnchor),

@@ -57,7 +57,7 @@ Swift 5.10, Xcode 26 (macOS 26 SDK), macOS 26 or later, Apple silicon, XcodeGen 
 - Bundle ID `com.jaredatch.Grock`. MIT license. Sparkle is the only third-party dependency.
 - Fresh install: Quick Chat is ⌥Space. New Chat, Show Grock, and Voice Chat are unset until the user assigns them. Show Grock never hides a window that is already up.
 - One `WKWebView`, owned by `WebViewStore`. Cookies and login live there, so there is never a second instance. X and Apple sign-in popups borrow its configuration and cookie store.
-- The overlay is a titled window at normal z-order. Close and Esc hide it. It comes to the current Space and, if needed, the display under the cursor.
+- The overlay is a titled window at normal z-order. Close and Esc hide it. It comes to the current Space and, if needed, the display under the cursor. At its default width it widens by the sidebar's width while the sidebar is open (DEC-074).
 - Interactive launch shows the window. Login-item launch stays quiet until summoned.
 - `grock://` (show), `grock://new`, `grock://new?text=`, `grock://ask?text=`, `grock://imagine?generate=`, plus repeatable `file=` and `bookmark=` on `new` and `ask`. The `grock` CLI wraps those URLs and lives inside the app bundle.
 - Files handed over by the OS (Dock, Open With, `open -a`, status item drop) land on Quick Chat. Finder → Services → Ask Grok lands on a New Chat in the overlay. Drops on the open window attach in grok.com.

@@ -1325,14 +1325,18 @@ final class WebViewStore {
         _ pref: ChromePreference.Snapshot = ChromePreference.current,
         collapse: Bool = false,
         forceCollapse: Bool = false,
-        expand: Bool = false
+        expand: Bool = false,
+        thenResize: (@MainActor () -> Void)? = nil
     ) {
         let json = pref.jsonString
+        // With `thenResize` the page holds the sidebar change until the
+        // window resize reaches it, so both land in one layout (DEC-074).
         let js = """
         window.__grockChromeConfig = \(json);
-        window.__grockChrome && window.__grockChrome.set(\(json), {collapse: \(collapse), forceCollapse: \(forceCollapse), expand: \(expand)});
+        window.__grockChrome && window.__grockChrome.set(\(json), {collapse: \(collapse), forceCollapse: \(forceCollapse), expand: \(expand), withResize: \(thenResize != nil)});
         """
         webView.evaluateJavaScript(js) { [weak self] _, _ in
+            MainActor.assumeIsolated { thenResize?() }
             Task { @MainActor in
                 self?.probeSessionActions()
             }
