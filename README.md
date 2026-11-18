@@ -11,7 +11,7 @@
 ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
 [![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-<img src="docs/assets/window.png" width="900" alt="The Grock window: grok.com's sidebar with projects and chats, a native titlebar, and a conversation summarizing an attached PDF">
+<img src="docs/assets/window.png" width="900" alt="The Grock window in the Mac style: a Finder-style sidebar with projects and chats, a native titlebar, and a conversation summarizing an attached PDF">
 
 </div>
 
@@ -51,11 +51,13 @@ You need macOS 26 or later on Apple silicon, plus a grok.com account (free or Su
 
 **Downloads that work.** Generated images and files land in `~/Downloads`. A footer tells you when a download finished or failed, with a Show in Finder button.
 
+**Styled like a Mac app.** Grock restyles grok.com to sit closer to Finder: neutral colors, the system font, your accent color, and a sidebar that looks like a Mac sidebar. Opening the sidebar widens the window, so the chat keeps its room. If you'd rather have grok.com exactly as it ships, switch Style to Grok in Appearance settings.
+
 **Hide what you don't use.** Appearance settings have a switch for each part of grok.com, like Projects, Plugins, or voice mode. The theme follows your Mac unless you pin it to light or dark.
 
 <p align="center">
 <img src="docs/assets/settings-general.png" width="440" alt="General settings: hotkeys for Quick Chat, New Chat, Show Grock and Voice Chat, clipboard capture, Hide from Dock, and Launch at Login">
-<img src="docs/assets/settings-appearance.png" width="440" alt="Appearance settings: theme, Hide Sidebar on Launch, and switches that hide Imagine, Library, Automations, Projects, Plugins, Grok Bot, Private, Dictation, and Voice mode">
+<img src="docs/assets/settings-appearance.png" width="440" alt="Appearance settings: theme, the Mac or Grok style, Hide Sidebar on Launch, and switches that hide Imagine, Library, Automations, Projects, Plugins, Grok Bot, Private, Dictation, and Voice mode">
 </p>
 
 ## Automate it
