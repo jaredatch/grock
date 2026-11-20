@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Quick Chat no longer fails with "Couldn't send" when you start from an open chat. grok.com swaps its composer in the moment after New Chat, and a prompt typed just before the swap was lost while the file stayed attached. Grock now types it again before sending.
+- Showing Grock for an unread answer stays at the start of that answer. grok.com could pull the chat back to the end a moment later.
+
 ## 1.1.0 (2026-11-18)
 
 Grock now restyles grok.com to look like a Mac app, and the window makes room for the sidebar.
