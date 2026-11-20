@@ -847,32 +847,7 @@ final class GrockTests: XCTestCase {
     /// to that would show the end of the answer, not its start.
     @MainActor
     func testReplyObserverScrollsToTheStartOfTheLastAnswer() async throws {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <body style="margin:0;overflow:hidden">
-          <div id="grok-content-area" role="main" style="height:300px;overflow:hidden">
-            <div id="transcript" role="log" data-testid="chat-transcript-scroller"
-                 style="height:300px;overflow-y:scroll">
-              <div data-testid="user-message"><span data-bubble-text>First question</span></div>
-              <div data-testid="assistant-message" style="height:500px">First answer</div>
-              <div data-testid="response-footer-actions">
-                <button aria-label="Copy response" style="width:20px;height:20px"></button>
-              </div>
-              <div data-testid="user-message"><span data-bubble-text>Second question</span></div>
-              <div id="last-answer" data-testid="assistant-message" style="height:900px">Second answer</div>
-              <div id="last-footer" data-testid="response-footer-actions">
-                <button aria-label="Copy response" style="width:20px;height:20px"></button>
-              </div>
-            </div>
-            <form data-composer>
-              <button aria-label="Voice mode" style="width:32px;height:32px"></button>
-            </form>
-          </div>
-        </body>
-        </html>
-        """
-        let (webView, window) = try await loadReplyObserver(html: html)
+        let (webView, window) = try await loadReplyObserver(html: Self.transcriptFixture)
         _ = window
         let result = try await callSessionJavaScript(webView, """
           var outcome = window.__grockReply.scrollToAnswer();
@@ -883,6 +858,90 @@ final class GrockTests: XCTestCase {
         XCTAssertEqual(result?["outcome"] as? String, "scrolled")
         // The answer starts just below the 52pt titlebar.
         XCTAssertEqual(try XCTUnwrap(result?["offset"] as? Double), 52, accuracy: 1)
+    }
+
+    /// grok.com pins the transcript to the bottom while an answer streams and
+    /// lets go only when a scroll lands within 250ms of the reader's own
+    /// upward input; any other scroll leaves the pin on, and the next layout
+    /// change pulls the thread back to the end. That showed the end of an
+    /// unread answer instead of its start.
+    @MainActor
+    func testReplyObserverRevealOutlastsTheBottomPin() async throws {
+        let (webView, window) = try await loadReplyObserver(html: Self.transcriptFixture)
+        _ = window
+        try await installBottomPin(webView)
+        let offset = try await callSessionJavaScript(webView, """
+          window.__grockReply.scrollToAnswer();
+          await new Promise(resolve => setTimeout(resolve, 100));
+          window.grow();
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return window.answerOffset();
+        """) as? Double
+        XCTAssertEqual(try XCTUnwrap(offset), 52, accuracy: 1)
+    }
+
+    private static let transcriptFixture = """
+    <!DOCTYPE html>
+    <html>
+    <body style="margin:0;overflow:hidden">
+      <div id="grok-content-area" role="main" style="height:300px;overflow:hidden">
+        <div id="transcript" role="log" data-testid="chat-transcript-scroller"
+             style="height:300px;overflow-y:scroll">
+          <div id="rows">
+            <div data-testid="user-message"><span data-bubble-text>First question</span></div>
+            <div data-testid="assistant-message" style="height:500px">First answer</div>
+            <div data-testid="response-footer-actions">
+              <button aria-label="Copy response" style="width:20px;height:20px"></button>
+            </div>
+            <div data-testid="user-message"><span data-bubble-text>Second question</span></div>
+            <div id="last-answer" data-testid="assistant-message" style="height:900px">Second answer</div>
+            <div id="last-footer" data-testid="response-footer-actions">
+              <button aria-label="Copy response" style="width:20px;height:20px"></button>
+            </div>
+          </div>
+        </div>
+        <form data-composer>
+          <button aria-label="Voice mode" style="width:32px;height:32px"></button>
+        </form>
+      </div>
+    </body>
+    </html>
+    """
+
+    /// A stand-in for grok.com's pin (its transcript scroll engine, Nov 2026):
+    /// pinned at the bottom, released only by a scroll up seen within 250ms
+    /// of an upward wheel, and re-applied whenever the rows change size.
+    @MainActor
+    private func installBottomPin(_ webView: WKWebView) async throws {
+        _ = try await callSessionJavaScript(webView, """
+          var scroller = document.getElementById('transcript');
+          var rows = document.getElementById('rows');
+          var pinned = true;
+          var lastTop = 0;
+          var wheelUpAt = -Infinity;
+          function toBottom() { scroller.scrollTop = scroller.scrollHeight; lastTop = scroller.scrollTop; }
+          scroller.addEventListener('wheel', function (event) {
+            if (event.deltaY < 0) wheelUpAt = performance.now();
+          }, { passive: true });
+          scroller.addEventListener('scroll', function () {
+            var top = scroller.scrollTop;
+            if (pinned && top < lastTop && performance.now() - wheelUpAt <= 250) pinned = false;
+            lastTop = top;
+          }, { passive: true });
+          new ResizeObserver(function () { if (pinned) toBottom(); }).observe(rows);
+          toBottom();
+          window.grow = function () {
+            var row = document.createElement('div');
+            row.style.height = '40px';
+            rows.appendChild(row);
+          };
+          window.answerOffset = function () {
+            return document.getElementById('last-answer').getBoundingClientRect().top
+              - scroller.getBoundingClientRect().top;
+          };
+          await new Promise(resolve => setTimeout(resolve, 50));
+          return 1;
+        """)
     }
 
     @MainActor

@@ -2130,9 +2130,19 @@ final class WebViewStore {
         }
         return best || root;
       }
+      // grok.com pins the transcript to the bottom while an answer streams,
+      // and lets go only when a scroll follows the reader's own upward input.
+      // Without that, its next layout pass pulls the thread back to the end.
+      function releaseBottomPin(scroller) {
+        if (!scroller || typeof WheelEvent !== 'function') return;
+        try {
+          scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+        } catch (err) {}
+      }
       function scrollToAnswer() {
         var target = lastAnswer();
         var scroller = findScroller();
+        if (target) releaseBottomPin(scroller);
         if (target && target.scrollIntoView) {
           target.scrollIntoView({ block: 'start', inline: 'nearest' });
         } else if (scroller) {
