@@ -1145,6 +1145,18 @@ final class WebViewStore {
         return grockAttachmentEvidence(file).some(function (el) { return baseline[index].indexOf(el) < 0; });
       });
     }
+    // While a New Chat settles, grok.com can swap its composer for a fresh,
+    // empty one. An attached file survives that and our text does not. Before
+    // anything is sent, type the text again into the replacement, a few times
+    // at most. A replacement that already holds text is someone's edit: leave it.
+    var grockRetypes = 0;
+    function grockRetypeIntoReplacement(previous, current, text, keepCommand) {
+      if (!current || current === previous || !String(text || '').length) return false;
+      if (grockComposerText(current).trim() || grockRetypes >= 3) return false;
+      grockRetypes++;
+      grockSetText(current, text, keepCommand);
+      return true;
+    }
     async function grockWaitForAttachments(files, baseline, waitMS, draftUnchanged) {
       if (!files || !files.length) return 'attached';
       var deadline = Date.now() + waitMS, readySince = null;
@@ -1182,9 +1194,15 @@ final class WebViewStore {
     var expectedDraft = grockComposerText(composer);
     var outcome = await grockWaitForAttachments(files, attachmentBaseline, attachmentWaitMS, function () {
       var current = grockFindComposer();
+      // Mid-swap there is briefly no composer. The checks after the wait need one.
+      if (!current) return true;
+      if (grockRetypeIntoReplacement(composer, current, promptText, wantsCommand)) {
+        composer = current;
+        expectedDraft = grockComposerText(current);
+      }
       // Typing into the same composer while an upload runs is intentional.
       // A replacement composer must retain the draft before we accept it.
-      return current && (current === composer || grockComposerText(current) === expectedDraft);
+      return current === composer || grockComposerText(current) === expectedDraft;
     });
     if (grockCancelled()) return 'cancelled';
     if (!grockOnRoute()) return 'navigation-changed';
@@ -1249,21 +1267,28 @@ final class WebViewStore {
     else if (grockIsStockAttachPrompt(grockComposerText(composer))) grockClearText(composer);
     var expectedText = grockNormalize(promptText);
     var deadline = Date.now() + sendWaitMS;
-    var uploadOutcome = await grockWaitForAttachments(files, attachmentBaseline, sendWaitMS, function () {
+    // True while the composer holds the prompt, or is briefly gone mid-swap.
+    // A swapped-in empty composer gets the prompt again. Never retype over an
+    // edit: other text stops the send and keeps the package for review.
+    function grockDraftIntact() {
       var current = grockFindComposer();
-      return current && grockNormalize(grockComposerText(current)) === expectedText;
-    });
+      if (!current) return true;
+      grockRetypeIntoReplacement(composer, current, promptText, false);
+      if (grockNormalize(grockComposerText(current)) !== expectedText) return false;
+      composer = current;
+      return true;
+    }
+    var uploadOutcome = await grockWaitForAttachments(files, attachmentBaseline, sendWaitMS, grockDraftIntact);
     if (uploadOutcome !== 'attached') return uploadOutcome;
     var attachmentsReady = true;
     var send = null;
     while (Date.now() < deadline) {
       if (grockCancelled()) return 'cancelled';
       if (!grockOnRoute()) return 'navigation-changed';
-      composer = grockFindComposer();
-      // Do not retype over an edit or a React remount. Preserve the package for review.
-      if (!composer || grockNormalize(grockComposerText(composer)) !== expectedText) return 'draft-changed';
+      if (!grockDraftIntact()) return 'draft-changed';
+      var present = grockFindComposer();
       attachmentsReady = grockAttachmentsReady(files, attachmentBaseline);
-      send = attachmentsReady ? grockFindSend(composer) : null;
+      send = attachmentsReady && present ? grockFindSend(present) : null;
       if (send) break;
       await grockSleep(80);
     }

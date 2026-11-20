@@ -141,6 +141,62 @@ final class ChatHandoffTests: XCTestCase {
         XCTAssertEqual(state["clicks"] as? Int, 1)
     }
 
+    /// grok.com can swap its composer for a new, empty one while a New Chat
+    /// settles, after the file is attached and the text is typed. The file
+    /// stays and the text goes with the old element. Nothing has been sent,
+    /// so the text goes back in and the package goes out once, complete.
+    func testComposerRemountedAfterAttachGetsTheTextBackAndSendsOnce() async throws {
+        let fixture = try await fixture(extra: "<input type='file'>", script: """
+        send.disabled = true;
+        window.sentText = null;
+        send.addEventListener('click', function () {
+          var composer = document.getElementById('composer');
+          window.sentText = composer.value;
+          composer.value = '';
+          send.textContent = 'Stop generating';
+        });
+        document.querySelector('input').addEventListener('change', function () {
+          var form = document.querySelector('form');
+          setTimeout(function () { document.getElementById('composer').remove(); }, 20);
+          setTimeout(function () {
+            var fresh = document.createElement('textarea');
+            fresh.id = 'composer';
+            form.insertBefore(fresh, form.firstChild);
+            var chip = document.createElement('span');
+            chip.textContent = 'notes.txt';
+            form.appendChild(chip);
+            send.disabled = false;
+          }, 120);
+        });
+        """)
+        defer { fixture.window.close() }
+        let result = try await submit(fixture.webView, files: [file], sendWaitMS: 1_000, acceptWaitMS: 600)
+        XCTAssertEqual(result, "accepted")
+        let state = try await state(fixture.webView)
+        XCTAssertEqual(state["clicks"] as? Int, 1)
+        let sent = try await fixture.webView.evaluateJavaScript("window.sentText")
+        XCTAssertEqual(sent as? String, "Hello Grok")
+    }
+
+    /// A replacement composer that already holds other text is not ours to
+    /// overwrite. Stop before sending and keep the package.
+    func testReplacementComposerWithOtherTextIsNotOverwritten() async throws {
+        let fixture = try await fixture(button: "<button id='send' disabled>Send</button>", script: """
+        document.getElementById('composer').addEventListener('input', function () {
+          setTimeout(function () {
+            document.getElementById('composer').outerHTML = '<textarea id="composer">A new thought</textarea>';
+            send.disabled = false;
+          }, 20);
+        }, {once:true});
+        """)
+        defer { fixture.window.close() }
+        let result = try await submit(fixture.webView)
+        XCTAssertEqual(result, "draft-changed")
+        let state = try await state(fixture.webView)
+        XCTAssertEqual(state["clicks"] as? Int, 0)
+        XCTAssertEqual(state["draft"] as? String, "A new thought")
+    }
+
     func testNavigationDuringReadinessNeverSendsOnNewRoute() async throws {
         let fixture = try await fixture(button: "<button id='send' disabled>Send</button>", script: """
         document.getElementById('composer').addEventListener('input', function () {
@@ -223,6 +279,32 @@ final class ChatHandoffTests: XCTestCase {
         XCTAssertEqual(state["draft"] as? String, "")
         XCTAssertEqual(state["clicks"] as? Int, 0)
         XCTAssertEqual(state["enters"] as? Int, 0)
+    }
+
+    /// The prefill twin of the send case: `grock://new` and Ask Grok land on
+    /// the same New Chat, so the same composer swap must not drop the text.
+    func testPrefillSurvivesComposerRemountAfterAttach() async throws {
+        let fixture = try await fixture(extra: "<input type='file'>", script: """
+        document.querySelector('input').addEventListener('change', function () {
+          var form = document.querySelector('form');
+          setTimeout(function () {
+            document.getElementById('composer').outerHTML = '<textarea id="composer"></textarea>';
+            var chip = document.createElement('span');
+            chip.textContent = 'notes.txt';
+            form.appendChild(chip);
+          }, 40);
+        });
+        """)
+        defer { fixture.window.close() }
+        let result = try await fixture.webView.callAsyncJavaScript(
+            WebViewStore.fillComposerScript,
+            arguments: ["promptText": "Keep everything", "files": [file], "operationID": "remount-prefill",
+                        "expectedPath": "/", "attachmentWaitMS": 1_000], in: nil, contentWorld: .page
+        )
+        XCTAssertEqual(result as? String, "filled")
+        let state = try await state(fixture.webView)
+        XCTAssertEqual(state["draft"] as? String, "Keep everything")
+        XCTAssertEqual(state["clicks"] as? Int, 0)
     }
 
     func testIgnoredPrefillUploadIsRecoverableAndRetriesInFreshDocument() async throws {
