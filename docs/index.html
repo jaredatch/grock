@@ -81,8 +81,8 @@
   .top nav a { color: var(--muted); text-decoration: none; }
   .top nav a:hover { color: var(--ink); }
 
-  .hero { display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); gap: 56px; align-items: center; padding-top: 72px; padding-bottom: 88px; }
-  h1 { font: 700 clamp(42px, 5.4vw, 74px)/1 var(--serif); letter-spacing: -0.025em; margin: 0 0 24px; }
+  .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-top: 72px; padding-bottom: 88px; }
+  h1 { font: 700 clamp(40px, 4.6vw, 60px)/1.02 var(--serif); letter-spacing: -0.025em; margin: 0 0 24px; }
   .lede { font-size: 20px; line-height: 1.45; color: var(--muted); max-width: 30em; }
   .keys { display: flex; align-items: center; gap: 10px; margin: 36px 0 12px; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; }
   .key { display: flex; height: 62px; border-radius: 11px; border: 1px solid var(--key-line);
@@ -103,7 +103,7 @@
   .copy { font: 13px var(--sans); color: var(--blue); background: none; border: 0; padding: 2px 4px; cursor: pointer; }
 
   .stage { margin: 0; }
-  .stage video { display: block; width: 100%; height: auto; aspect-ratio: 1040 / 800; border-radius: 18px; background: #2a6fc0;
+  .stage video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 14px; background: #eceef1;
                  box-shadow: 0 0 0 1px rgba(0, 0, 0, .12), 0 30px 60px -30px rgba(15, 40, 90, .55); }
 
   .band { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 48px; padding-top: 64px; padding-bottom: 64px; background: linear-gradient(var(--line), var(--line)) top center / calc(100% - 2 * var(--pad)) 1px no-repeat; }
@@ -185,9 +185,9 @@
     </div>
 
     <figure class="stage">
-      <video id="demo" muted playsinline preload="metadata" poster="assets/quick-chat-poster.jpg" width="1040" height="800"
-             aria-label="Quick Chat: a card appears over the desktop with a PDF attached, a prompt is typed, and the Grock window opens with Grok's answer">
-        <source src="assets/quick-chat.mp4" type="video/mp4">
+      <video id="demo" muted playsinline controls preload="metadata" poster="assets/grock-film-poster.jpg" width="1920" height="1080"
+             aria-label="A 28-second film: ⌥Space opens the Quick Chat card, a PDF is dropped on it, a prompt is typed and sent with Return, Esc hides the window, the Dock icon gets a badge, and a click opens the finished answer">
+        <source src="assets/grock-film.mp4" type="video/mp4">
       </video>
     </figure>
   </div>
@@ -284,7 +284,6 @@
   var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function play() { try { demo.currentTime = 0; demo.play(); } catch (e) {} }
   keys.addEventListener('click', play);
-  demo.addEventListener('click', play);
   document.addEventListener('keydown', function (e) {
     if (e.altKey && e.code === 'Space' && !e.repeat) { e.preventDefault(); keys.classList.add('down'); play(); }
   });
